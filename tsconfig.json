@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "es2022"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["apps/web/src/*"],
+      "@rivallens/ai": ["packages/ai/src/index.ts"],
+      "@rivallens/connectors": ["packages/connectors/src/index.ts"],
+      "@rivallens/connectors/website": ["packages/connectors/src/website/index.ts"],
+      "@rivallens/db": ["packages/db/src/index.ts"],
+      "@rivallens/domain": ["packages/domain/src/index.ts"],
+      "@rivallens/intelligence": ["packages/intelligence/src/index.ts"],
+      "@rivallens/schemas": ["packages/schemas/src/index.ts"]
+    }
+  },
+  "include": ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "tests/**/*.ts"]
+}

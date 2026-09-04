@@ -1,0 +1,7 @@
+{
+  "name": "@rivallens/ai",
+  "version": "0.0.0",
+  "private": true,
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@rivallens/schemas": "workspace:*", "zod": "^3.25.76" }
+}

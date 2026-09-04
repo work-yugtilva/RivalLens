@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RivalLens D2C — Implementation Plan</title><style>
+:root{
+  --bg:#f6f7f9; --surface:#fff; --surface2:#fafbfc; --text:#17191e; --muted:#667085;
+  --line:#e4e7ec; --accent:#315efb; --accent2:#7c3aed; --soft:#eef3ff;
+  --green:#067647; --amber:#b54708; --red:#b42318; --code:#101828;
+  --radius:16px; --shadow:0 8px 28px rgba(16,24,40,.055); --max:1220px;
+}
+*{box-sizing:border-box} html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.58}
+a{color:inherit;text-decoration:none} code,pre{font-family:"SFMono-Regular",Consolas,monospace}
+.layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:26px;max-width:var(--max);margin:0 auto;padding:26px}
+.sidebar{position:sticky;top:20px;align-self:start;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:17px;box-shadow:var(--shadow);max-height:calc(100vh - 40px);overflow:auto}
+.brand{padding:6px 8px 15px;border-bottom:1px solid var(--line);margin-bottom:10px}
+.brand h2{font-size:17px;margin:0 0 3px;letter-spacing:-.02em}.brand p{font-size:10px;color:var(--muted);margin:0;text-transform:uppercase;letter-spacing:.12em}
+.nav a{display:block;padding:8px 10px;border-radius:9px;font-size:13px;color:#475467;margin:2px 0}
+.nav a:hover,.nav a.active{background:var(--soft);color:var(--accent)}
+.doc{min-width:0}.hero{background:linear-gradient(135deg,#fff,#f7f9ff);border:1px solid var(--line);border-radius:22px;padding:38px;box-shadow:var(--shadow);margin-bottom:20px}
+.kicker{font-size:11px;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+h1{font-size:40px;line-height:1.08;letter-spacing:-.043em;margin:0 0 13px}.hero p{font-size:16px;color:#475467;max-width:820px;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.tag{font-size:11px;padding:6px 9px;border-radius:999px;background:#fff;border:1px solid var(--line);color:#475467}
+.section{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:26px;margin-bottom:17px;box-shadow:0 5px 18px rgba(16,24,40,.03);scroll-margin-top:22px}
+.section h2{margin:0 0 14px;font-size:23px;letter-spacing:-.025em}.section h3{margin:20px 0 8px;font-size:16px}.section p{margin:7px 0;color:#475467}.section ul,.section ol{padding-left:20px;margin:8px 0 0}.section li{margin:5px 0;color:#3f4755}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.card{border:1px solid var(--line);background:var(--surface2);border-radius:14px;padding:16px}.card h4{margin:0 0 5px;font-size:14px}.card p{margin:0;color:var(--muted);font-size:13px}
+.callout{background:var(--soft);border-left:3px solid var(--accent);padding:13px 15px;border-radius:10px;margin:13px 0;color:#344054}.warn{background:#fffaeb;border-left-color:#f79009}.ok{background:#ecfdf3;border-left-color:#12b76a}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px}table{width:100%;border-collapse:collapse;min-width:760px;background:#fff;font-size:13px}th,td{padding:11px 13px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:#f8f9fb;color:#475467;font-size:10px;text-transform:uppercase;letter-spacing:.05em}tr:last-child td{border-bottom:0}
+pre{background:var(--code);color:#f2f4f7;border-radius:14px;padding:17px;overflow:auto;font-size:12px;line-height:1.55;margin:13px 0}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}.node{border:1px solid var(--line);background:#fff;border-radius:11px;padding:9px 12px;font-size:12px;font-weight:650}.arrow{color:#98a2b3}
+.pill{font-size:10px;border-radius:999px;padding:4px 7px;border:1px solid var(--line);white-space:nowrap}.high{color:var(--red);background:#fff3f1}.med{color:var(--amber);background:#fff8eb}.good{color:var(--green);background:#ecfdf3}
+.footer{font-size:11px;color:var(--muted);text-align:center;padding:7px 0 24px}
+@media(max-width:900px){.layout{grid-template-columns:1fr;padding:15px}.sidebar{position:static;max-height:none}.nav{display:flex;overflow:auto;gap:4px}.nav a{white-space:nowrap}.grid3{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){.hero{padding:25px}h1{font-size:33px}.section{padding:20px}.grid2,.grid3{grid-template-columns:1fr}}
+</style></head>
+<body><div class="layout"><aside class="sidebar"><div class="brand"><h2>RivalLens D2C</h2><p>Implementation Plan</p></div>
+<nav class="nav"><a href="#overview">Overview</a><a href="#strategy">Delivery Strategy</a><a href="#phase0">Phase 0</a><a href="#phase1">Phase 1</a><a href="#phase2">Phase 2</a><a href="#phase3">Phase 3</a><a href="#phase4">Phase 4</a><a href="#quality">Quality Gates</a><a href="#agents">Claude/Codex/Cursor</a><a href="#issues">Issue Breakdown</a><a href="#release">Release Criteria</a><a href="#postmvp">Post-MVP</a></nav></aside><main class="doc">
+<section class="hero" id="overview"><div class="kicker">Implementation Plan · Senior Engineering Perspective</div>
+<h1>RivalLens D2C — Implementation Plan</h1>
+<p>Build the smallest vertical slice that can prove RivalLens creates useful competitive decisions. Website intelligence ships first; social and Meta complexity are added only after the evidence → signal → report pipeline is working.</p>
+<div class="meta"><span class="tag">Method: vertical slices</span><span class="tag">AI-assisted development</span><span class="tag">Release gates: tests + evidence quality</span><span class="tag">Avoid: connector-first overbuilding</span></div></section>
+
+<section class="section" id="strategy"><h2>1. Delivery Strategy</h2>
+<div class="grid2">
+<div class="card"><h4>Vertical slices</h4><p>Each phase ends with a user-visible capability running through UI → API → DB → jobs → evidence → report.</p></div>
+<div class="card"><h4>Contract-first connectors</h4><p>Define schemas/interfaces before platform-specific code so providers remain replaceable.</p></div>
+<div class="card"><h4>Fixtures before scale</h4><p>Build a corpus of representative D2C pages/posts/ads and lock expected extraction behavior.</p></div>
+<div class="card"><h4>AI last in the pipeline</h4><p>Use deterministic extraction and metrics first. Add AI interpretation only after structured data is trustworthy.</p></div>
+</div></section>
+
+<section class="section" id="phase0"><h2>2. Phase 0 — Foundation</h2>
+<p><span class="pill high">Goal</span> Establish the repo and contracts so agents cannot accidentally create three competing architectures.</p>
+<ul>
+<li>Create pnpm monorepo with apps/web, packages/db, domain, schemas, intelligence, ai, connectors.</li>
+<li>Initialize Next.js, Tailwind, shadcn/ui, Supabase client/server setup, Drizzle, test framework.</li>
+<li>Create environment validation and secrets policy.</li>
+<li>Implement organizations, memberships, brands, competitors schema + RLS tests.</li>
+<li>Define shared connector, snapshot, observation, signal, and report Zod schemas.</li>
+<li>Set CI: install → typecheck → lint → unit → database tests.</li>
+</ul>
+<div class="callout ok"><strong>Exit gate:</strong> a signed-in user can create a brand and competitor and cannot access another organization's data.</div>
+</section>
+
+<section class="section" id="phase1"><h2>3. Phase 1 — Website Intelligence MVP</h2>
+<p><span class="pill high">Goal</span> Prove the core product without social APIs.</p>
+<ol>
+<li>Brand URL onboarding and source discovery.</li>
+<li>Website connector: HTTP-first, Playwright fallback.</li>
+<li>Snapshot storage + content hashing.</li>
+<li>Commerce extraction: products, prices, discounts, bundles, shipping, guarantees, subscriptions.</li>
+<li>Positioning extraction: headline, value proposition, audience, proof, primary CTA.</li>
+<li>Observation storage and before/after diffing.</li>
+<li>Comparison engine: user brand vs 3–5 competitors.</li>
+<li>First four-part report: advantages / rival advantages / working patterns / what to test.</li>
+<li>Evidence drawer UI.</li>
+</ol>
+<div class="callout"><strong>Critical validation:</strong> manually review at least 20 D2C sites across multiple storefront implementations. If extraction quality is poor, do not proceed to social.</div>
+</section>
+
+<section class="section" id="phase2"><h2>4. Phase 2 — Social Intelligence</h2>
+<p><span class="pill med">Goal</span> Add content-performance evidence without breaking report simplicity.</p>
+<ul>
+<li>Implement X connector behind shared adapter.</li>
+<li>Implement Instagram professional-account connector behind shared adapter.</li>
+<li>Store social posts and metric snapshots.</li>
+<li>Calculate relative performance against each account's own historical baseline.</li>
+<li>Classify hook, topic, format, CTA, promotional intensity, founder-led/UGC/product style.</li>
+<li>Cluster comments/replies into recurring customer themes.</li>
+<li>Add Social lenses to Rival and Compare screens.</li>
+<li>Allow cross-source signals only after sufficient data coverage.</li>
+</ul>
+</section>
+
+<section class="section" id="phase3"><h2>5. Phase 3 — Meta Ads</h2>
+<p><span class="pill med">Goal</span> Add paid-creative intelligence without making Meta access a single point of failure.</p>
+<ul>
+<li>Create provider-neutral ad schema first.</li>
+<li>Implement manual Ad Library / creative import path.</li>
+<li>Add one compliant provider connector if commercially justified.</li>
+<li>Classify creative format, hook, angle, offer, CTA, landing page, UGC/demo/testimonial style.</li>
+<li>Track first/last observed dates and repeated creative families.</li>
+<li>Add ad-specific comparison and opportunity rules.</li>
+<li>Explicitly prohibit unsupported spend, ROAS, conversion, and targeting claims.</li>
+</ul>
+</section>
+
+<section class="section" id="phase4"><h2>6. Phase 4 — Cross-Source Intelligence</h2>
+<ul>
+<li>Evidence graph and weighted signal_evidence relations.</li>
+<li>Confidence rules based on source diversity, recency, extraction confidence, and repeated observations.</li>
+<li>Opportunity ranking using impact × confidence × effort heuristics.</li>
+<li>Report revision history and material-change detection.</li>
+<li>Weekly monitoring summary / in-app notification layer.</li>
+<li>Cost-aware job scheduling and organization-level budgets.</li>
+</ul>
+</section>
+
+<section class="section" id="quality"><h2>7. Quality Gates</h2>
+<div class="table-wrap"><table><thead><tr><th>Gate</th><th>Required</th></tr></thead><tbody>
+<tr><td>Type safety</td><td>No TypeScript errors; no unchecked external payloads entering domain logic.</td></tr>
+<tr><td>Unit tests</td><td>Parsers, normalizers, scoring, diff logic, URL validation.</td></tr>
+<tr><td>Contract tests</td><td>Every connector passes the same adapter test suite.</td></tr>
+<tr><td>RLS tests</td><td>Cross-organization reads/writes explicitly denied.</td></tr>
+<tr><td>Fixture regression</td><td>Representative D2C pages/posts/ads produce stable observations.</td></tr>
+<tr><td>AI evals</td><td>Schema adherence and unsupported-claim rate checked against curated examples.</td></tr>
+<tr><td>E2E</td><td>Brand onboarding → rivals → analysis → report → evidence.</td></tr>
+<tr><td>UX</td><td>First report understandable without opening Evidence or Settings.</td></tr>
+</tbody></table></div></section>
+
+<section class="section" id="agents"><h2>8. Claude / Codex / Cursor Workflow</h2>
+<div class="table-wrap"><table><thead><tr><th>Tool</th><th>Use it for</th><th>Preferred task size</th></tr></thead><tbody>
+<tr><td>Claude</td><td>Architecture review, large-context code review, data-model critique, eval design</td><td>Cross-package reasoning</td></tr>
+<tr><td>Codex</td><td>Issue-scoped implementation, migrations, connectors, tests, debugging</td><td>1 focused story / PR</td></tr>
+<tr><td>Cursor</td><td>Fast local edits, component composition, navigation, small refactors</td><td>Small-to-medium multi-file changes</td></tr>
+</tbody></table></div>
+
+<h3>Standard agent prompt</h3>
+<pre>Implement: [issue ID + title]
+
+Read first:
+- relevant PRD/TRD section
+- packages/schemas contracts
+- existing domain interfaces
+- relevant tests
+
+Constraints:
+- preserve connector boundaries
+- no new dependency without justification
+- validate external and AI output with Zod
+- preserve evidence provenance
+- no unrelated refactors
+
+Acceptance criteria:
+1. ...
+2. ...
+3. ...
+
+Before editing:
+Return a concise plan and list of files likely to change.
+
+Before completion:
+Run typecheck, lint, unit tests, relevant integration/RLS tests.
+Return changed files, tests run, and unresolved risks.</pre>
+</section>
+
+<section class="section" id="issues"><h2>9. Recommended Issue Breakdown</h2>
+<div class="table-wrap"><table><thead><tr><th>Epic</th><th>First implementation issues</th></tr></thead><tbody>
+<tr><td>Foundation</td><td>Repo scaffold; shared schemas; auth; org/membership RLS; CI.</td></tr>
+<tr><td>Brand onboarding</td><td>Create brand; add competitors; validate domains; onboarding UX.</td></tr>
+<tr><td>Website collection</td><td>Source discovery; fetcher; Playwright fallback; snapshot storage; hashing.</td></tr>
+<tr><td>Extraction</td><td>Product parser; price/offer parser; positioning parser; observation persistence.</td></tr>
+<tr><td>Comparison</td><td>Brand baseline service; comparison query; comparison matrix UI.</td></tr>
+<tr><td>Intelligence</td><td>Diff rules; signal service; confidence rules; evidence drawer.</td></tr>
+<tr><td>Reporting</td><td>Four-section report contract; generator; revisioning; Overview UI.</td></tr>
+<tr><td>Social</td><td>X adapter; Instagram adapter; metric snapshots; social classification.</td></tr>
+<tr><td>Ads</td><td>Ad schema; manual import; provider adapter; creative analysis.</td></tr>
+</tbody></table></div>
+</section>
+
+<section class="section" id="release"><h2>10. MVP Release Criteria</h2>
+<ul>
+<li>User can create a brand and monitor at least three competitors.</li>
+<li>Website analysis extracts a useful baseline on the majority of the test corpus.</li>
+<li>Report contains evidence-backed comparisons and no unsupported private-performance claims.</li>
+<li>One failed source does not prevent report generation.</li>
+<li>RLS tests prove tenant isolation.</li>
+<li>Background tasks are idempotent and retry safely.</li>
+<li>Core workflow works on desktop and mobile.</li>
+<li>Production telemetry shows connector status, job failures, AI cost, crawl cost, and report generation latency.</li>
+</ul></section>
+
+<section class="section" id="postmvp"><h2>11. Post-MVP Order</h2>
+<ol>
+<li>Shopify first-party integration.</li>
+<li>Meta Ads Manager integration for the user's own brand.</li>
+<li>GA4/Klaviyo first-party performance context.</li>
+<li>Saved experiments and outcome tracking.</li>
+<li>Category-specific D2C models (beauty, apparel, supplements, etc.).</li>
+<li>Only after D2C proves value: separate RivalLens B2B/SaaS product model.</li>
+</ol>
+<div class="callout warn"><strong>Do not prematurely generalize.</strong> A generic competitor intelligence platform will weaken the strongest part of the current thesis: D2C-specific offers, creative, storefront, and social intelligence.</div>
+</section>
+<div class="footer">RivalLens D2C · Implementation Plan · v0.1</div></main></div>
+<script>
+const links=[...document.querySelectorAll('.nav a')];
+const sections=links.map(a=>document.querySelector(a.getAttribute('href'))).filter(Boolean);
+if('IntersectionObserver' in window){
+  const obs=new IntersectionObserver(entries=>entries.forEach(e=>{
+    if(e.isIntersecting) links.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+e.target.id));
+  }),{rootMargin:'-25% 0px -65% 0px',threshold:0});
+  sections.forEach(s=>obs.observe(s));
+}
+</script>
+</body></html>

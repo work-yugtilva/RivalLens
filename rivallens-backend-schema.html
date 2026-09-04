@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RivalLens D2C — Backend Schema</title><style>
+:root{
+  --bg:#f6f7f9; --surface:#fff; --surface2:#fafbfc; --text:#17191e; --muted:#667085;
+  --line:#e4e7ec; --accent:#315efb; --accent2:#7c3aed; --soft:#eef3ff;
+  --green:#067647; --amber:#b54708; --red:#b42318; --code:#101828;
+  --radius:16px; --shadow:0 8px 28px rgba(16,24,40,.055); --max:1220px;
+}
+*{box-sizing:border-box} html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.58}
+a{color:inherit;text-decoration:none} code,pre{font-family:"SFMono-Regular",Consolas,monospace}
+.layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:26px;max-width:var(--max);margin:0 auto;padding:26px}
+.sidebar{position:sticky;top:20px;align-self:start;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:17px;box-shadow:var(--shadow);max-height:calc(100vh - 40px);overflow:auto}
+.brand{padding:6px 8px 15px;border-bottom:1px solid var(--line);margin-bottom:10px}
+.brand h2{font-size:17px;margin:0 0 3px;letter-spacing:-.02em}.brand p{font-size:10px;color:var(--muted);margin:0;text-transform:uppercase;letter-spacing:.12em}
+.nav a{display:block;padding:8px 10px;border-radius:9px;font-size:13px;color:#475467;margin:2px 0}
+.nav a:hover,.nav a.active{background:var(--soft);color:var(--accent)}
+.doc{min-width:0}.hero{background:linear-gradient(135deg,#fff,#f7f9ff);border:1px solid var(--line);border-radius:22px;padding:38px;box-shadow:var(--shadow);margin-bottom:20px}
+.kicker{font-size:11px;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+h1{font-size:40px;line-height:1.08;letter-spacing:-.043em;margin:0 0 13px}.hero p{font-size:16px;color:#475467;max-width:820px;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.tag{font-size:11px;padding:6px 9px;border-radius:999px;background:#fff;border:1px solid var(--line);color:#475467}
+.section{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:26px;margin-bottom:17px;box-shadow:0 5px 18px rgba(16,24,40,.03);scroll-margin-top:22px}
+.section h2{margin:0 0 14px;font-size:23px;letter-spacing:-.025em}.section h3{margin:20px 0 8px;font-size:16px}.section p{margin:7px 0;color:#475467}.section ul,.section ol{padding-left:20px;margin:8px 0 0}.section li{margin:5px 0;color:#3f4755}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.card{border:1px solid var(--line);background:var(--surface2);border-radius:14px;padding:16px}.card h4{margin:0 0 5px;font-size:14px}.card p{margin:0;color:var(--muted);font-size:13px}
+.callout{background:var(--soft);border-left:3px solid var(--accent);padding:13px 15px;border-radius:10px;margin:13px 0;color:#344054}.warn{background:#fffaeb;border-left-color:#f79009}.ok{background:#ecfdf3;border-left-color:#12b76a}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px}table{width:100%;border-collapse:collapse;min-width:760px;background:#fff;font-size:13px}th,td{padding:11px 13px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:#f8f9fb;color:#475467;font-size:10px;text-transform:uppercase;letter-spacing:.05em}tr:last-child td{border-bottom:0}
+pre{background:var(--code);color:#f2f4f7;border-radius:14px;padding:17px;overflow:auto;font-size:12px;line-height:1.55;margin:13px 0}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}.node{border:1px solid var(--line);background:#fff;border-radius:11px;padding:9px 12px;font-size:12px;font-weight:650}.arrow{color:#98a2b3}
+.pill{font-size:10px;border-radius:999px;padding:4px 7px;border:1px solid var(--line);white-space:nowrap}.high{color:var(--red);background:#fff3f1}.med{color:var(--amber);background:#fff8eb}.good{color:var(--green);background:#ecfdf3}
+.footer{font-size:11px;color:var(--muted);text-align:center;padding:7px 0 24px}
+@media(max-width:900px){.layout{grid-template-columns:1fr;padding:15px}.sidebar{position:static;max-height:none}.nav{display:flex;overflow:auto;gap:4px}.nav a{white-space:nowrap}.grid3{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){.hero{padding:25px}h1{font-size:33px}.section{padding:20px}.grid2,.grid3{grid-template-columns:1fr}}
+</style></head>
+<body><div class="layout"><aside class="sidebar"><div class="brand"><h2>RivalLens D2C</h2><p>Backend Schema</p></div>
+<nav class="nav"><a href="#overview">Overview</a><a href="#erd">ERD</a><a href="#tables">Core Tables</a><a href="#evidence">Evidence Model</a><a href="#social">Social & Ads</a><a href="#jobs">Jobs</a><a href="#rls">RLS & Security</a><a href="#indexes">Indexes</a><a href="#storage">Storage</a><a href="#migration">Migration Rules</a></nav></aside><main class="doc">
+<section class="hero" id="overview"><div class="kicker">Backend Schema · Senior Engineering Perspective</div>
+<h1>RivalLens D2C — Backend Schema</h1>
+<p>PostgreSQL/Supabase schema optimized for multi-tenant competitive intelligence, immutable source evidence, time-series social metrics, connector independence, and evidence-backed AI analysis.</p>
+<div class="meta"><span class="tag">PostgreSQL</span><span class="tag">Supabase Auth + RLS</span><span class="tag">Drizzle migrations</span><span class="tag">pgvector optional</span></div></section>
+
+<section class="section" id="erd"><h2>1. High-Level ERD</h2>
+<pre>auth.users
+    │
+    ▼
+organization_members ───► organizations
+                              │
+                              ▼
+                            brands
+                              │
+               ┌──────────────┼───────────────┐
+               ▼              ▼               ▼
+          competitors       reports        opportunities
+               │
+               ▼
+             sources
+               │
+               ▼
+            snapshots
+               │
+               ▼
+          observations
+               │
+          ┌────┴─────┐
+          ▼          ▼
+       signals ◄── signal_evidence
+          │
+          ▼
+    recommendations
+
+social_accounts ─► social_posts ─► social_metric_snapshots
+ad_accounts     ─► ads          ─► ad_metric_snapshots
+jobs / connector_runs track asynchronous collection</pre>
+</section>
+
+<section class="section" id="tables"><h2>2. Core Tables</h2>
+<div class="table-wrap"><table><thead><tr><th>Table</th><th>Key columns</th><th>Notes</th></tr></thead><tbody>
+<tr><td>organizations</td><td>id uuid PK, name text, created_at timestamptz</td><td>Tenant boundary.</td></tr>
+<tr><td>organization_members</td><td>organization_id, user_id, role, created_at</td><td>Unique(org,user). Roles: owner/admin/member.</td></tr>
+<tr><td>brands</td><td>id, organization_id, name, domain, category, status</td><td>User-owned D2C brand.</td></tr>
+<tr><td>competitors</td><td>id, brand_id, name, domain, status, created_at</td><td>Scoped under one user brand.</td></tr>
+<tr><td>sources</td><td>id, subject_type, subject_id, connector_type, source_type, canonical_url, external_id, status</td><td>Canonical monitored source; subject is brand or competitor.</td></tr>
+<tr><td>snapshots</td><td>id, source_id, captured_at, content_hash, raw_artifact_path, normalized_artifact_path, metadata jsonb</td><td>Immutable collection event.</td></tr>
+<tr><td>observations</td><td>id, snapshot_id, subject_id, fact_type, payload jsonb, confidence numeric, extractor_version</td><td>Structured facts only.</td></tr>
+<tr><td>signals</td><td>id, brand_id, competitor_id nullable, signal_type, title, hypothesis, confidence, status, first_seen_at, last_seen_at</td><td>Derived hypotheses.</td></tr>
+<tr><td>signal_evidence</td><td>signal_id, observation_id, weight numeric, relation text</td><td>Many-to-many provenance.</td></tr>
+<tr><td>recommendations</td><td>id, brand_id, signal_id nullable, title, rationale, expected_learning, effort, priority, status</td><td>Recommended tests/actions.</td></tr>
+<tr><td>reports</td><td>id, brand_id, revision bigint, generated_at, status, summary jsonb, evidence_revision</td><td>Versioned four-section report.</td></tr>
+</tbody></table></div>
+</section>
+
+<section class="section" id="evidence"><h2>3. Evidence & Versioning Model</h2>
+<pre>snapshots = what the collector saw
+observations = deterministic/validated facts extracted from a snapshot
+signals = interpretation supported by observations
+recommendations = action derived from one or more signals
+reports = versioned presentation of current signals/recommendations</pre>
+<ul>
+<li>Snapshots and observations are append-only for V1. Corrections create new records rather than rewriting history.</li>
+<li>Signals can change lifecycle state: active, weakened, resolved, dismissed.</li>
+<li>Every AI-derived object stores <code>model_provider</code>, <code>model_name</code>, <code>prompt_version</code>, and <code>analysis_version</code>.</li>
+<li>Use JSONB for variable connector payloads, but promote frequently queried fields into typed columns.</li>
+</ul>
+</section>
+
+<section class="section" id="social"><h2>4. Social, Ads & Commerce Tables</h2>
+<div class="table-wrap"><table><thead><tr><th>Table</th><th>Key columns</th><th>Purpose</th></tr></thead><tbody>
+<tr><td>social_accounts</td><td>id, subject_id, platform, external_account_id, handle, profile_url, followers_count, last_synced_at</td><td>Competitor or owned social identity.</td></tr>
+<tr><td>social_posts</td><td>id, social_account_id, external_post_id, posted_at, text, media_type, permalink, media_artifact_path, classification jsonb</td><td>Canonical post/media object.</td></tr>
+<tr><td>social_metric_snapshots</td><td>id, post_id, observed_at, likes, comments, replies, reposts, quotes, views, impressions nullable</td><td>Time-series public metrics.</td></tr>
+<tr><td>ads</td><td>id, subject_id, platform, external_ad_id nullable, first_observed_at, last_observed_at, status, copy jsonb, creative_artifact_path, landing_url, classification jsonb</td><td>Observed ad creative independent of provider.</td></tr>
+<tr><td>ad_variants</td><td>id, ad_id, variant_hash, creative_artifact_path, copy jsonb</td><td>Related creative/copy variants.</td></tr>
+<tr><td>products</td><td>id, subject_id, external_key nullable, canonical_url, name, category, active</td><td>Normalized product identity.</td></tr>
+<tr><td>product_snapshots</td><td>id, product_id, captured_at, price, compare_at_price, currency, availability, offer_data jsonb</td><td>Historical product/offer state.</td></tr>
+</tbody></table></div></section>
+
+<section class="section" id="jobs"><h2>5. Operational Tables</h2>
+<div class="table-wrap"><table><thead><tr><th>Table</th><th>Key columns</th></tr></thead><tbody>
+<tr><td>connector_runs</td><td>id, connector_type, source_id, started_at, finished_at, status, items_collected, cost_estimate, error_code, error_detail</td></tr>
+<tr><td>jobs</td><td>id, organization_id, job_type, external_job_id, idempotency_key, status, attempt, created_at, completed_at</td></tr>
+<tr><td>analysis_runs</td><td>id, brand_id, analysis_type, input_revision, model_provider, model_name, prompt_version, tokens_in, tokens_out, estimated_cost, status</td></tr>
+<tr><td>source_health</td><td>source_id PK, last_success_at, last_failure_at, consecutive_failures, degraded_reason</td></tr>
+</tbody></table></div>
+</section>
+
+<section class="section" id="rls"><h2>6. RLS & Authorization</h2>
+<div class="callout warn">Every table reachable through the Supabase Data API must have Row Level Security enabled and explicit grants/policies. RLS is not a substitute for correct grants.</div>
+<h3>Tenant rule</h3>
+<p>Access is granted when the authenticated user is a member of the organization that owns the brand ultimately associated with the row. Avoid duplicating <code>user_id</code> across every table solely for RLS convenience.</p>
+<pre>organization_members
+  organization_id
+  user_id
+  role
+
+brands.organization_id
+competitors.brand_id -> brands.organization_id
+...
+</pre>
+<h3>Policy pattern</h3>
+<ul>
+<li>Use <code>TO authenticated</code> plus a membership predicate; never rely on the authenticated role alone.</li>
+<li>UPDATE policies require both <code>USING</code> and <code>WITH CHECK</code>.</li>
+<li>Views exposed through the API should use <code>security_invoker = true</code> where supported.</li>
+<li>Never use user-editable metadata for authorization.</li>
+<li>Service-role/secret credentials remain server-only and are never exposed to the browser.</li>
+</ul>
+</section>
+
+<section class="section" id="indexes"><h2>7. Indexes & Constraints</h2>
+<pre>UNIQUE organization_members(organization_id, user_id)
+UNIQUE competitors(brand_id, domain)
+UNIQUE sources(subject_id, connector_type, canonical_url)
+UNIQUE social_posts(social_account_id, external_post_id)
+UNIQUE jobs(idempotency_key)
+
+INDEX snapshots(source_id, captured_at DESC)
+INDEX observations(subject_id, fact_type, created_at DESC)
+INDEX signals(brand_id, status, confidence DESC)
+INDEX social_metric_snapshots(post_id, observed_at DESC)
+INDEX product_snapshots(product_id, captured_at DESC)
+INDEX connector_runs(source_id, started_at DESC)</pre>
+<p>Use partial indexes for active signals and active competitors if the working set becomes large. Add pgvector indexes only after real similarity workloads exist; do not pre-optimize the MVP.</p>
+</section>
+
+<section class="section" id="storage"><h2>8. Storage Layout</h2>
+<pre>evidence/
+  {organization_id}/
+    {subject_id}/
+      web/{source_id}/{snapshot_id}.html.gz
+      screenshots/{snapshot_id}.webp
+      social/{post_id}/...
+      ads/{ad_id}/...
+      reports/{report_id}.json</pre>
+<ul>
+<li>Bucket is private by default; access is via signed URLs or server-mediated retrieval.</li>
+<li>Store hashes to deduplicate identical screenshots/creatives.</li>
+<li>Define retention rules for raw HTML and media independently.</li>
+<li>Database backups do not automatically represent object-storage backup strategy; treat them separately.</li>
+</ul></section>
+
+<section class="section" id="migration"><h2>9. Migration & Schema Change Rules</h2>
+<ol>
+<li>Create version-controlled migrations through the approved Supabase/Drizzle workflow.</li>
+<li>All schema changes include corresponding RLS/grant changes in the same review.</li>
+<li>Run database advisor/security checks before merging production migrations.</li>
+<li>Write RLS tests for allow and deny paths for organization isolation.</li>
+<li>Prefer additive/backward-compatible migrations; remove columns only after application code no longer reads them.</li>
+<li>AI agents may draft SQL, but schema ownership, constraints, indexes, and RLS must receive manual review.</li>
+</ol></section>
+<div class="footer">RivalLens D2C · Backend Schema · v0.1</div></main></div>
+<script>
+const links=[...document.querySelectorAll('.nav a')];
+const sections=links.map(a=>document.querySelector(a.getAttribute('href'))).filter(Boolean);
+if('IntersectionObserver' in window){
+  const obs=new IntersectionObserver(entries=>entries.forEach(e=>{
+    if(e.isIntersecting) links.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+e.target.id));
+  }),{rootMargin:'-25% 0px -65% 0px',threshold:0});
+  sections.forEach(s=>obs.observe(s));
+}
+</script>
+</body></html>

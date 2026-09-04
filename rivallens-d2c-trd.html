@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RivalLens D2C — Technical Requirements Document</title>
+  <style>
+    :root{
+      --bg:#f6f7f9;
+      --surface:#ffffff;
+      --surface-2:#fafbfc;
+      --text:#16181d;
+      --muted:#667085;
+      --line:#e4e7ec;
+      --accent:#315efb;
+      --accent-soft:#eef3ff;
+      --success:#067647;
+      --warning:#b54708;
+      --danger:#b42318;
+      --code:#101828;
+      --radius:16px;
+      --shadow:0 10px 30px rgba(16,24,40,.06);
+      --max:1220px;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--text);
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      line-height:1.6;
+    }
+    a{color:inherit;text-decoration:none}
+    code,pre{font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace}
+    .layout{
+      display:grid;
+      grid-template-columns:260px minmax(0,1fr);
+      gap:28px;
+      max-width:var(--max);
+      margin:0 auto;
+      padding:28px;
+    }
+    .sidebar{
+      position:sticky;
+      top:22px;
+      align-self:start;
+      background:var(--surface);
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:18px;
+      box-shadow:var(--shadow);
+      max-height:calc(100vh - 44px);
+      overflow:auto;
+    }
+    .brand{padding:6px 8px 16px;border-bottom:1px solid var(--line);margin-bottom:12px}
+    .brand h2{margin:0 0 3px;font-size:18px;letter-spacing:-.02em}
+    .brand p{margin:0;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em}
+    .nav a{
+      display:block;
+      padding:9px 10px;
+      border-radius:10px;
+      color:#475467;
+      font-size:13px;
+      margin:2px 0;
+    }
+    .nav a:hover,.nav a.active{background:var(--accent-soft);color:var(--accent)}
+    .doc{min-width:0}
+    .hero{
+      background:linear-gradient(135deg,#fff 0%,#f7f9ff 100%);
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:42px;
+      box-shadow:var(--shadow);
+      margin-bottom:22px;
+    }
+    .eyebrow{
+      color:var(--accent);
+      font-size:12px;
+      font-weight:750;
+      letter-spacing:.11em;
+      text-transform:uppercase;
+      margin-bottom:12px;
+    }
+    h1{font-size:42px;line-height:1.08;letter-spacing:-.045em;margin:0 0 14px}
+    .hero p{font-size:17px;color:#475467;max-width:820px;margin:0}
+    .meta{display:flex;flex-wrap:wrap;gap:9px;margin-top:22px}
+    .tag{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:12px;color:#475467}
+    .summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:22px}
+    .metric{background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px}
+    .metric small{display:block;color:var(--muted);font-size:11px;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+    .metric strong{font-size:14px}
+    .section{
+      background:var(--surface);
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:28px;
+      margin-bottom:18px;
+      box-shadow:0 6px 18px rgba(16,24,40,.035);
+      scroll-margin-top:24px;
+    }
+    .section h2{margin:0 0 16px;font-size:24px;letter-spacing:-.025em}
+    .section h3{margin:22px 0 9px;font-size:17px}
+    .section p{color:#475467;margin:8px 0}
+    .section ul,.section ol{margin:10px 0 0;padding-left:21px}
+    .section li{margin:6px 0;color:#3f4858}
+    .callout{
+      border-left:3px solid var(--accent);
+      background:var(--accent-soft);
+      border-radius:10px;
+      padding:14px 16px;
+      color:#344054;
+      margin:14px 0;
+    }
+    .warning{
+      border-left-color:#f79009;
+      background:#fffaeb;
+    }
+    .success{
+      border-left-color:#12b76a;
+      background:#ecfdf3;
+    }
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    .card{border:1px solid var(--line);background:var(--surface-2);border-radius:14px;padding:17px}
+    .card h4{margin:0 0 6px;font-size:14px}
+    .card p{margin:0;font-size:13px;color:var(--muted)}
+    .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px}
+    table{width:100%;border-collapse:collapse;min-width:800px;background:#fff;font-size:13px}
+    th,td{padding:12px 14px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{background:#f8f9fb;color:#475467;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+    tr:last-child td{border-bottom:0}
+    pre{
+      margin:14px 0;
+      background:var(--code);
+      color:#f2f4f7;
+      border-radius:14px;
+      padding:18px;
+      overflow:auto;
+      font-size:12px;
+      line-height:1.55;
+    }
+    .req{
+      display:grid;
+      grid-template-columns:74px minmax(0,1fr) 105px;
+      gap:12px;
+      align-items:start;
+      padding:12px 0;
+      border-bottom:1px solid var(--line);
+    }
+    .req:last-child{border-bottom:0}
+    .req-id{font-weight:750;color:#344054}
+    .pill{
+      justify-self:end;
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:4px 8px;
+      font-size:11px;
+      background:#fff;
+    }
+    .pill.high{color:var(--danger);background:#fff3f1;border-color:#ffd5cf}
+    .pill.medium{color:var(--warning);background:#fff8eb;border-color:#fedf89}
+    .accordion{border:1px solid var(--line);border-radius:13px;margin:10px 0;overflow:hidden}
+    .accordion button{
+      width:100%;
+      border:0;
+      background:#fff;
+      padding:14px 16px;
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      cursor:pointer;
+      text-align:left;
+      color:var(--text);
+      font:inherit;
+    }
+    .accordion button:hover{background:#fafbfc}
+    .accordion .body{display:none;padding:0 16px 16px}
+    .accordion.open .body{display:block}
+    .chev{color:var(--muted);transition:transform .2s ease}
+    .accordion.open .chev{transform:rotate(180deg)}
+    .trace{
+      display:grid;
+      grid-template-columns:90px 90px minmax(0,1fr);
+      gap:12px;
+      padding:10px 0;
+      border-bottom:1px solid var(--line);
+      font-size:13px;
+    }
+    .trace:last-child{border-bottom:0}
+    .footer{color:var(--muted);font-size:12px;text-align:center;padding:8px 0 28px}
+    @media(max-width:920px){
+      .layout{grid-template-columns:1fr;padding:16px}
+      .sidebar{position:static;max-height:none}
+      .nav{display:flex;gap:5px;overflow:auto;padding-bottom:3px}
+      .nav a{white-space:nowrap}
+      .summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media(max-width:640px){
+      .hero{padding:26px}
+      h1{font-size:34px}
+      .section{padding:22px}
+      .grid,.summary-grid{grid-template-columns:1fr}
+      .req{grid-template-columns:60px minmax(0,1fr)}
+      .pill{grid-column:2;justify-self:start}
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">
+      <h2>RivalLens D2C</h2>
+      <p>Technical Requirements Document</p>
+    </div>
+    <nav class="nav">
+      <a href="#overview">Overview</a>
+      <a href="#principles">Engineering Principles</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#stack">Tech Stack</a>
+      <a href="#repo">Repository</a>
+      <a href="#data">Data Model</a>
+      <a href="#connectors">Connectors</a>
+      <a href="#intelligence">Intelligence Engine</a>
+      <a href="#jobs">Jobs & Scheduling</a>
+      <a href="#api">API Contracts</a>
+      <a href="#security">Security</a>
+      <a href="#observability">Observability</a>
+      <a href="#testing">Testing</a>
+      <a href="#deployment">Deployment</a>
+      <a href="#vibecoding">AI Coding Workflow</a>
+      <a href="#phases">Build Phases</a>
+      <a href="#traceability">Traceability</a>
+      <a href="#risks">Technical Risks</a>
+    </nav>
+  </aside>
+
+  <main class="doc">
+    <section class="hero" id="overview">
+      <div class="eyebrow">TRD · v0.1</div>
+      <h1>RivalLens D2C — Technical Requirements</h1>
+      <p>
+        Implementation blueprint for the D2C competitive-intelligence platform defined in the PRD. This document is written
+        from a production engineering perspective: ship an MVP fast, keep connectors replaceable, preserve evidence provenance,
+        and make the codebase safe to evolve with Claude, Codex, and Cursor.
+      </p>
+      <div class="meta">
+        <span class="tag">Architecture: TypeScript-first</span>
+        <span class="tag">Data: PostgreSQL + immutable evidence</span>
+        <span class="tag">AI: Structured interpretation, never source of truth</span>
+        <span class="tag">Build style: Agent-assisted, test-gated</span>
+      </div>
+      <div class="summary-grid">
+        <div class="metric"><small>Primary architecture</small><strong>Modular monorepo</strong></div>
+        <div class="metric"><small>MVP connectors</small><strong>Web · Instagram · X · Meta Ads</strong></div>
+        <div class="metric"><small>Core output</small><strong>Evidence-backed action report</strong></div>
+        <div class="metric"><small>Key constraint</small><strong>External platform instability</strong></div>
+      </div>
+    </section>
+
+    <section class="section" id="principles">
+      <h2>1. Engineering Principles</h2>
+      <div class="grid">
+        <div class="card"><h4>Evidence before inference</h4><p>Persist source facts first. Derived metrics, signals, and AI explanations must remain downstream and traceable.</p></div>
+        <div class="card"><h4>Replaceable connectors</h4><p>Meta, Instagram, X, and crawler integrations must sit behind stable interfaces so provider changes do not infect core logic.</p></div>
+        <div class="card"><h4>One language for MVP</h4><p>Use TypeScript across UI, API, workers, connectors, schemas, and jobs. Add Python only when a concrete modeling need justifies it.</p></div>
+        <div class="card"><h4>Thin AI layer</h4><p>AI classifies, clusters, summarizes, and explains structured inputs. It must not invent performance metrics or unsupported causal claims.</p></div>
+        <div class="card"><h4>Observable by default</h4><p>Every background task must be traceable by run ID, source, status, cost, duration, and error reason.</p></div>
+        <div class="card"><h4>Vibe-code safely</h4><p>AI agents can accelerate implementation, but architectural boundaries, schemas, tests, and migrations are human-owned contracts.</p></div>
+      </div>
+    </section>
+
+    <section class="section" id="architecture">
+      <h2>2. System Architecture</h2>
+      <pre>                    ┌──────────────────────┐
+                    │     Next.js App      │
+                    │ UI + API boundaries  │
+                    └──────────┬───────────┘
+                               │
+                    ┌──────────▼───────────┐
+                    │   Application Core   │
+                    │ brands / rivals /    │
+                    │ reports / projects   │
+                    └──────────┬───────────┘
+                               │
+          ┌────────────────────┼────────────────────┐
+          │                    │                    │
+┌─────────▼─────────┐ ┌────────▼────────┐ ┌────────▼────────┐
+│ Connector Layer   │ │ Intelligence     │ │ Background Jobs │
+│ Web / IG / X / Ads│ │ Engine           │ │ Trigger.dev      │
+└─────────┬─────────┘ └────────┬────────┘ └────────┬────────┘
+          │                    │                    │
+          └────────────────────┼────────────────────┘
+                               │
+                    ┌──────────▼───────────┐
+                    │ Evidence + Domain DB │
+                    │ Postgres / pgvector  │
+                    └──────────┬───────────┘
+                               │
+                    ┌──────────▼───────────┐
+                    │ Object Storage       │
+                    │ screenshots / media  │
+                    └──────────────────────┘</pre>
+
+      <div class="callout">
+        The core domain must not import vendor SDKs directly. Vendor-specific code belongs inside connector/adapter packages.
+      </div>
+    </section>
+
+    <section class="section" id="stack">
+      <h2>3. Technology Stack</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Layer</th><th>Selected</th><th>Purpose</th><th>Alternative</th></tr></thead>
+          <tbody>
+            <tr><td>Language</td><td>TypeScript</td><td>Single language across frontend, API, workers, connectors</td><td>Python</td></tr>
+            <tr><td>Web</td><td>Next.js</td><td>UI, server actions/API routes, auth-aware app shell</td><td>React + Vite + Hono</td></tr>
+            <tr><td>Database</td><td>Supabase Postgres</td><td>Relational domain data, history, auth integration</td><td>Neon / RDS</td></tr>
+            <tr><td>ORM</td><td>Drizzle</td><td>Typed SQL schema and migrations</td><td>Kysely / Prisma</td></tr>
+            <tr><td>Web crawling</td><td>Crawlee + Playwright</td><td>Recurring page discovery, crawling, screenshots, dynamic sites</td><td>Firecrawl / Apify</td></tr>
+            <tr><td>Fallback extraction</td><td>Firecrawl</td><td>Managed structured extraction for difficult pages</td><td>Browserbase / Apify</td></tr>
+            <tr><td>Jobs</td><td>Trigger.dev</td><td>Schedules, retries, long-running tasks, observability</td><td>BullMQ / Inngest / Temporal</td></tr>
+            <tr><td>AI</td><td>OpenAI Node SDK</td><td>Structured classification, vision analysis, summarization</td><td>Claude / Gemini</td></tr>
+            <tr><td>Validation</td><td>Zod</td><td>Validate connector, API, and AI outputs</td><td>Valibot / TypeBox</td></tr>
+            <tr><td>Semantic search</td><td>pgvector</td><td>Theme clustering, similarity, repeated creative concepts</td><td>Qdrant / Pinecone</td></tr>
+            <tr><td>Storage</td><td>Supabase Storage</td><td>Screenshots, creative images, source artifacts</td><td>S3 / R2</td></tr>
+            <tr><td>Hosting</td><td>Vercel + Supabase + Trigger.dev</td><td>Low-ops MVP deployment</td><td>Railway / Fly.io</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="repo">
+      <h2>4. Repository Structure</h2>
+      <pre>rivallens/
+├── apps/
+│   └── web/                    # Next.js product
+├── packages/
+│   ├── db/                     # Drizzle schema, migrations, repositories
+│   ├── domain/                 # Core entities and business rules
+│   ├── schemas/                # Shared Zod contracts
+│   ├── intelligence/           # Metrics, scoring, evidence graph, recommendations
+│   ├── ai/                     # Provider abstraction + prompt/version registry
+│   ├── connectors/
+│   │   ├── website/
+│   │   ├── instagram/
+│   │   ├── x/
+│   │   └── meta-ads/
+│   └── observability/          # logging, metrics, tracing helpers
+├── workers/
+│   ├── crawler/
+│   ├── social-sync/
+│   ├── ad-sync/
+│   └── analysis/
+├── trigger/
+│   ├── crawl-brand.ts
+│   ├── crawl-competitor.ts
+│   ├── sync-social.ts
+│   ├── analyze-evidence.ts
+│   └── generate-report.ts
+├── tests/
+│   ├── fixtures/
+│   ├── integration/
+│   └── e2e/
+└── docs/
+    ├── architecture/
+    ├── connector-contracts/
+    └── prompts/</pre>
+
+      <div class="callout success">
+        Keep the application layer thin. The actual product logic should live in packages/domain and packages/intelligence so it can be tested without browsers or external APIs.
+      </div>
+    </section>
+
+    <section class="section" id="data">
+      <h2>5. Data Model</h2>
+      <h3>Core entities</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Entity</th><th>Purpose</th><th>Important fields</th></tr></thead>
+          <tbody>
+            <tr><td>organizations</td><td>User/company account</td><td>id, name, created_at</td></tr>
+            <tr><td>brands</td><td>User's D2C brand</td><td>organization_id, domain, category</td></tr>
+            <tr><td>competitors</td><td>Tracked rival brands</td><td>brand_id, domain, active</td></tr>
+            <tr><td>sources</td><td>Canonical monitored source</td><td>entity_id, source_type, canonical_url, external_id</td></tr>
+            <tr><td>snapshots</td><td>Immutable collection event</td><td>source_id, captured_at, hash, artifact_url</td></tr>
+            <tr><td>observations</td><td>Structured facts extracted from snapshots</td><td>type, payload_json, confidence, snapshot_id</td></tr>
+            <tr><td>metric_snapshots</td><td>Time-series public social metrics</td><td>source_object_id, observed_at, values_json</td></tr>
+            <tr><td>signals</td><td>Derived strategic hypotheses</td><td>signal_type, confidence, status, explanation</td></tr>
+            <tr><td>signal_evidence</td><td>Many-to-many proof chain</td><td>signal_id, observation_id, weight</td></tr>
+            <tr><td>recommendations</td><td>Suggested experiments/actions</td><td>signal_id, priority, rationale, expected_learning</td></tr>
+            <tr><td>reports</td><td>Generated concise report versions</td><td>brand_id, report_version, generated_at</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Evidence contract</h3>
+      <pre>{
+  "observationId": "obs_123",
+  "sourceType": "website_pricing",
+  "subjectId": "competitor_abc",
+  "observedAt": "2026-09-01T18:00:00Z",
+  "factType": "price_changed",
+  "payload": {
+    "plan": "Pro",
+    "previousPrice": 39,
+    "currentPrice": 29,
+    "currency": "USD"
+  },
+  "sourceUrl": "https://example.com/pricing",
+  "confidence": 0.99
+}</pre>
+    </section>
+
+    <section class="section" id="connectors">
+      <h2>6. Connector Requirements</h2>
+      <pre>export interface RivalConnector {
+  discover(input: DiscoverInput): Promise&lt;DiscoveredSource[]&gt;;
+  collect(source: Source): Promise&lt;RawSnapshot&gt;;
+  normalize(snapshot: RawSnapshot): Promise&lt;Observation[]&gt;;
+  healthCheck(): Promise&lt;ConnectorHealth&gt;;
+}</pre>
+
+      <div class="accordion">
+        <button type="button"><strong>Website Connector</strong><span class="chev">⌄</span></button>
+        <div class="body">
+          <ul>
+            <li>Discover homepage, product, pricing, collection, policy, reviews, and promotional pages.</li>
+            <li>Prefer HTTP/HTML extraction where sufficient; escalate to Playwright only when rendering is required.</li>
+            <li>Strip scripts, navigation noise, tracking IDs, timestamps, and unstable markup before hashing.</li>
+            <li>Capture clean text, relevant structured data, screenshot reference, and normalized commerce fields.</li>
+            <li>Respect access restrictions, robots guidance where applicable, rate limits, and platform terms.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="accordion">
+        <button type="button"><strong>Instagram Connector</strong><span class="chev">⌄</span></button>
+        <div class="body">
+          <ul>
+            <li>Support public professional-account data available through compliant API access.</li>
+            <li>Normalize posts, Reels, captions, media type, timestamps, public engagement, and views when returned.</li>
+            <li>Never fabricate private metrics such as saves, reach, CTR, or conversions for competitors.</li>
+            <li>Connector must fail gracefully when the account or metric is unsupported.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="accordion">
+        <button type="button"><strong>X Connector</strong><span class="chev">⌄</span></button>
+        <div class="body">
+          <ul>
+            <li>Collect public post text, timestamps, media, replies, reposts, quotes, likes, and available public metrics.</li>
+            <li>Persist time-series metrics so performance velocity can be computed.</li>
+            <li>Enforce API budget and per-brand collection limits.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="accordion">
+        <button type="button"><strong>Meta Ads Connector</strong><span class="chev">⌄</span></button>
+        <div class="body">
+          <ul>
+            <li>Must remain provider-neutral because commercial ad access is the least stable integration.</li>
+            <li>Support manual/ad-library import and provider-based ingestion behind the same normalized schema.</li>
+            <li>Store creative type, primary text, headline, CTA, landing page, observed start date, and media reference.</li>
+            <li>Do not infer ROAS, spend, conversions, or targeting when not explicitly available.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="intelligence">
+      <h2>7. Intelligence Engine</h2>
+      <h3>Processing pipeline</h3>
+      <pre>Raw Snapshot
+    ↓
+Deterministic extraction
+    ↓
+Zod validation
+    ↓
+Observation store
+    ↓
+Derived metrics
+    ↓
+Cross-source signal rules
+    ↓
+Optional LLM interpretation
+    ↓
+Recommendation generation
+    ↓
+Concise report</pre>
+
+      <h3>Required analyzers</h3>
+      <div class="grid">
+        <div class="card"><h4>Offer Analyzer</h4><p>Discount depth, bundles, free shipping, subscriptions, guarantees, promo patterns.</p></div>
+        <div class="card"><h4>Pricing Analyzer</h4><p>Plan/product price changes, relative price position, subscription savings, bundle economics.</p></div>
+        <div class="card"><h4>Creative Analyzer</h4><p>Hook, angle, content format, UGC/testimonial/demo style, CTA, repeated concepts.</p></div>
+        <div class="card"><h4>Content Analyzer</h4><p>Topic, format, cadence, relative engagement, outliers, comment/reply themes.</p></div>
+        <div class="card"><h4>Positioning Analyzer</h4><p>Audience, claims, differentiators, proof, messaging changes, market whitespace.</p></div>
+        <div class="card"><h4>Comparison Engine</h4><p>User advantages, rival advantages, gaps, repeated competitor patterns, experiment candidates.</p></div>
+      </div>
+
+      <h3>Signal requirements</h3>
+      <div class="req"><div class="req-id">TR-INT-1</div><div>A strategic signal must reference one or more persisted observations.</div><div class="pill high">Must</div></div>
+      <div class="req"><div class="req-id">TR-INT-2</div><div>High-confidence strategy signals should require multiple independent evidence points when the claim is interpretive.</div><div class="pill high">Must</div></div>
+      <div class="req"><div class="req-id">TR-INT-3</div><div>LLM output must be validated against a structured schema before persistence.</div><div class="pill high">Must</div></div>
+      <div class="req"><div class="req-id">TR-INT-4</div><div>Prompt/model version must be stored with every AI-derived artifact.</div><div class="pill medium">Should</div></div>
+      <div class="req"><div class="req-id">TR-INT-5</div><div>Recommendations must be framed as tests/actions, not guarantees of business outcomes.</div><div class="pill high">Must</div></div>
+    </section>
+
+    <section class="section" id="jobs">
+      <h2>8. Background Jobs & Scheduling</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Job</th><th>Trigger</th><th>Retry policy</th><th>Idempotency key</th></tr></thead>
+          <tbody>
+            <tr><td>crawl-brand</td><td>Onboarding + scheduled refresh</td><td>3 exponential retries</td><td>brand + source + schedule window</td></tr>
+            <tr><td>crawl-competitor</td><td>Scheduled</td><td>3 retries, then degraded status</td><td>competitor + source + schedule window</td></tr>
+            <tr><td>sync-social</td><td>Scheduled by provider budget</td><td>Provider-aware backoff</td><td>account + cursor/window</td></tr>
+            <tr><td>sync-ads</td><td>Scheduled/manual import</td><td>Connector-specific</td><td>ad external ID + observed date</td></tr>
+            <tr><td>analyze-evidence</td><td>After new observations</td><td>2 retries</td><td>observation batch hash</td></tr>
+            <tr><td>generate-report</td><td>After material signal changes or user request</td><td>2 retries</td><td>brand + evidence revision</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warning">Do not schedule every connector at the same cadence. Website, X, Instagram, and Meta costs/limits differ and need independent policies.</div>
+    </section>
+
+    <section class="section" id="api">
+      <h2>9. API Contracts</h2>
+      <pre>POST   /api/brands
+POST   /api/brands/:id/competitors
+GET    /api/brands/:id/competitors
+POST   /api/sources/:id/refresh
+GET    /api/sources/:id/status
+GET    /api/competitors/:id/timeline
+GET    /api/brands/:id/comparison
+GET    /api/brands/:id/reports/latest
+POST   /api/brands/:id/reports/generate</pre>
+
+      <h3>Comparison response</h3>
+      <pre>{
+  "brandId": "brand_123",
+  "generatedAt": "...",
+  "advantages": [...],
+  "competitorAdvantages": [...],
+  "workingPatterns": [...],
+  "recommendedTests": [...],
+  "evidenceRevision": "rev_42"
+}</pre>
+      <ul>
+        <li>API responses must expose source/evidence IDs for every material claim.</li>
+        <li>Long-running collection calls return job IDs instead of blocking HTTP requests.</li>
+        <li>Pagination is required for timelines, posts, observations, and raw evidence.</li>
+      </ul>
+    </section>
+
+    <section class="section" id="security">
+      <h2>10. Security & Compliance</h2>
+      <ul>
+        <li>Use row-level authorization for organization-scoped data.</li>
+        <li>Keep provider tokens server-side and encrypt sensitive credentials at rest.</li>
+        <li>Never store secrets inside prompts, browser logs, screenshots, or client bundles.</li>
+        <li>Validate and normalize all user-submitted URLs before crawling to reduce SSRF risk.</li>
+        <li>Block private/internal network ranges from crawler targets.</li>
+        <li>Rate-limit onboarding, refresh, export, and report-generation endpoints.</li>
+        <li>Persist only data permitted by the relevant provider/platform contract.</li>
+        <li>Provide deletion paths for user organization data, stored media, and integrations.</li>
+      </ul>
+    </section>
+
+    <section class="section" id="observability">
+      <h2>11. Observability & Cost Controls</h2>
+      <div class="grid">
+        <div class="card"><h4>Structured logs</h4><p>job_id, organization_id, source_id, connector, duration, status, error_code.</p></div>
+        <div class="card"><h4>Connector health</h4><p>Success rate, provider latency, authentication state, quota/rate-limit state.</p></div>
+        <div class="card"><h4>AI costs</h4><p>Prompt version, model, tokens, media count, latency, estimated cost per analysis/report.</p></div>
+        <div class="card"><h4>Crawl costs</h4><p>Browser minutes, fallback-provider calls, pages crawled, bytes stored, screenshot count.</p></div>
+      </div>
+      <ul>
+        <li>Set monthly per-organization budget ceilings for expensive connectors and AI analysis.</li>
+        <li>Skip AI calls if deterministic hashes show no meaningful content changes.</li>
+        <li>Deduplicate identical creatives/posts before multimodal analysis.</li>
+      </ul>
+    </section>
+
+    <section class="section" id="testing">
+      <h2>12. Testing Strategy</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Test type</th><th>What it covers</th><th>Required for merge?</th></tr></thead>
+          <tbody>
+            <tr><td>Unit</td><td>parsers, scoring, normalization, URL handling, metrics, rules</td><td>Yes</td></tr>
+            <tr><td>Contract</td><td>connector adapters against fixtures and schemas</td><td>Yes</td></tr>
+            <tr><td>Integration</td><td>database repositories, job orchestration, report generation</td><td>Yes</td></tr>
+            <tr><td>Snapshot fixtures</td><td>known HTML/social/ad examples and expected observations</td><td>Yes</td></tr>
+            <tr><td>E2E</td><td>brand onboarding → add competitor → refresh → report</td><td>Yes for release</td></tr>
+            <tr><td>AI evaluation</td><td>classification accuracy, unsupported-claim rate, schema adherence</td><td>Release gate</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        The most important regression suite is not UI snapshots. It is a corpus of real/representative source fixtures that confirms extraction and intelligence behavior stays stable.
+      </div>
+    </section>
+
+    <section class="section" id="deployment">
+      <h2>13. Deployment & Environments</h2>
+      <pre>Local
+ ├── Next.js
+ ├── local/branch Postgres
+ └── mocked or sandbox connectors
+
+Preview
+ ├── Vercel preview
+ ├── isolated preview database where practical
+ └── expensive jobs disabled by default
+
+Production
+ ├── Vercel web
+ ├── Supabase Postgres + Storage
+ ├── Trigger.dev workers
+ └── external connector providers</pre>
+      <ul>
+        <li>Database migrations must run through version-controlled migration files.</li>
+        <li>Production migrations must be backward-compatible where possible.</li>
+        <li>Feature flags are required for new connectors and new AI analysis modes.</li>
+        <li>Connector rollout should support per-organization enablement.</li>
+      </ul>
+    </section>
+
+    <section class="section" id="vibecoding">
+      <h2>14. Claude / Codex / Cursor Development Workflow</h2>
+      <div class="callout success">
+        Use AI to increase throughput, not to remove engineering discipline. The repo should make the correct implementation path obvious enough that an agent cannot casually rewrite architecture.
+      </div>
+
+      <h3>Tool roles</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tool</th><th>Best use in this project</th><th>Avoid</th></tr></thead>
+          <tbody>
+            <tr><td>Claude</td><td>Architecture critique, long-context refactors, schema reasoning, test-case generation</td><td>Letting it redesign the whole system inside one implementation prompt</td></tr>
+            <tr><td>Codex</td><td>Scoped repository tasks, migrations, connectors, tests, debugging, implementation from written specs</td><td>Giving vague “build the whole feature” instructions with no acceptance criteria</td></tr>
+            <tr><td>Cursor</td><td>Fast local iteration, targeted multi-file edits, navigation, incremental refactors</td><td>Accepting broad generated diffs without reviewing boundaries and migrations</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Required agent workflow</h3>
+      <ol>
+        <li>Create or select one issue/story with explicit acceptance criteria.</li>
+        <li>Ask the agent to inspect existing contracts before writing code.</li>
+        <li>Require a short implementation plan for multi-file work.</li>
+        <li>Implement the smallest vertical slice.</li>
+        <li>Run typecheck, lint, unit tests, and relevant integration tests.</li>
+        <li>Review the diff manually before accepting generated changes.</li>
+        <li>Commit only after verifying database, connector, and API contracts remain intact.</li>
+      </ol>
+
+      <h3>Prompt template for implementation tasks</h3>
+      <pre>Goal:
+Implement TRD requirement TR-XXX.
+
+Relevant contracts:
+- packages/schemas/...
+- packages/domain/...
+- docs/connector-contracts/...
+
+Constraints:
+- Do not change unrelated architecture.
+- Do not add dependencies unless necessary.
+- Preserve evidence provenance.
+- All external/AI output must pass Zod validation.
+- Add or update tests.
+
+Acceptance criteria:
+1. ...
+2. ...
+3. ...
+
+Before editing:
+Inspect the relevant files and give a short implementation plan.
+
+Before completion:
+Run typecheck, lint, and relevant tests.
+Report files changed, tests run, and any unresolved risk.</pre>
+
+      <h3>Vibe-coding guardrails</h3>
+      <ul>
+        <li>No agent-generated database schema change without a migration and rollback/compatibility review.</li>
+        <li>No prompt strings scattered throughout the codebase; store prompt templates/version metadata centrally.</li>
+        <li>No direct vendor SDK usage outside connector/provider packages.</li>
+        <li>No generated “helper abstraction” unless it removes real duplication or enforces a domain boundary.</li>
+        <li>No merging code that passes typecheck but lacks behavior tests for extraction or signal logic.</li>
+        <li>Prefer boring, explicit code over clever framework tricks. This matters even more when agents maintain the repo.</li>
+      </ul>
+    </section>
+
+    <section class="section" id="phases">
+      <h2>15. Implementation Phases</h2>
+      <div class="accordion open">
+        <button type="button"><strong>Phase 1 — Core domain + website intelligence</strong><span class="chev">⌄</span></button>
+        <div class="body">
+          <ul>
+            <li>Monorepo, auth, organization/brand/competitor entities.</li>
+            <li>Website connector and source discovery.</li>
+            <li>Snapshots, observations, pricing/offer/product/positioning extraction.</li>
+            <li>User vs competitor comparison.</li>
+            <li>Basic four-section report.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="accordion">
+        <button type="button"><strong>Phase 2 — Social intelligence</strong><span class="chev">⌄</span></button>
+        <div class="body">
+          <ul>
+            <li>X and Instagram connectors.</li>
+            <li>Post/media normalization and metric snapshots.</li>
+            <li>Content classification, relative performance, replies/comments clustering.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="accordion">
+        <button type="button"><strong>Phase 3 — Meta ads</strong><span class="chev">⌄</span></button>
+        <div class="body">
+          <ul>
+            <li>Provider-neutral ad schema.</li>
+            <li>Manual/ad-library import path.</li>
+            <li>Creative analysis, offer extraction, concept longevity tracking.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="accordion">
+        <button type="button"><strong>Phase 4 — Cross-source signal engine</strong><span class="chev">⌄</span></button>
+        <div class="body">
+          <ul>
+            <li>Evidence graph.</li>
+            <li>Confidence-scored hypotheses.</li>
+            <li>Recommendation ranking and report revisioning.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="accordion">
+        <button type="button"><strong>Phase 5 — First-party integrations</strong><span class="chev">⌄</span></button>
+        <div class="body">
+          <ul>
+            <li>Shopify first, then selected analytics/ad platforms.</li>
+            <li>Use first-party performance to validate whether recommended patterns also work for the user's brand.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="traceability">
+      <h2>16. PRD → TRD Traceability</h2>
+      <div class="trace"><strong>PRD</strong><strong>TRD</strong><strong>Implementation meaning</strong></div>
+      <div class="trace"><span>FR-1</span><span>TR-DOM</span><span>Brands, competitors, sources, onboarding APIs.</span></div>
+      <div class="trace"><span>FR-2/3</span><span>TR-WEB</span><span>Website connector, snapshots, normalization, history.</span></div>
+      <div class="trace"><span>FR-4/5/6</span><span>TR-CONN</span><span>Instagram, X, and provider-neutral Meta adapters.</span></div>
+      <div class="trace"><span>FR-7</span><span>TR-DATA</span><span>Evidence → observation → signal → recommendation separation.</span></div>
+      <div class="trace"><span>FR-8</span><span>TR-INT</span><span>Cross-source evidence graph and confidence rules.</span></div>
+      <div class="trace"><span>FR-9</span><span>TR-COMP</span><span>User-brand baseline and rival comparison engine.</span></div>
+      <div class="trace"><span>FR-10</span><span>TR-REP</span><span>Versioned, concise four-section report generation.</span></div>
+    </section>
+
+    <section class="section" id="risks">
+      <h2>17. Technical Risks</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Risk</th><th>Impact</th><th>Mitigation</th></tr></thead>
+          <tbody>
+            <tr><td>Meta commercial-ad access changes</td><td>High</td><td>Provider-neutral connector + manual import path.</td></tr>
+            <tr><td>Website DOM changes</td><td>High</td><td>Structured data first, semantic extraction second, browser fallback, fixture regression suite.</td></tr>
+            <tr><td>Social API cost/limits</td><td>High</td><td>Budget-aware scheduling, caching, configurable collection windows.</td></tr>
+            <tr><td>LLM unsupported conclusions</td><td>High</td><td>Evidence-first pipeline, structured outputs, confidence rules, eval corpus.</td></tr>
+            <tr><td>Agent-generated architectural drift</td><td>Medium</td><td>Package boundaries, contracts, tests, issue-scoped prompts, manual diff review.</td></tr>
+            <tr><td>Storage growth from screenshots/media</td><td>Medium</td><td>Deduplication, retention policies, hashes, lifecycle rules.</td></tr>
+            <tr><td>Overbuilding before product validation</td><td>High</td><td>Phase 1 must deliver useful website-only comparison before adding social/ad complexity.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warning">
+        Senior engineering recommendation: do not start with every connector. Ship the website intelligence pipeline first. If that cannot produce a useful report, adding X, Instagram, and Meta will only create a more expensive bad product.
+      </div>
+    </section>
+
+    <div class="footer">RivalLens D2C · Technical Requirements Document · v0.1</div>
+  </main>
+</div>
+
+<script>
+  document.querySelectorAll('.accordion button').forEach(btn=>{
+    btn.addEventListener('click',()=>btn.closest('.accordion').classList.toggle('open'));
+  });
+
+  const links=[...document.querySelectorAll('.nav a')];
+  const sections=links.map(a=>document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  const observer=new IntersectionObserver(entries=>{
+    entries.forEach(entry=>{
+      if(entry.isIntersecting){
+        links.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+entry.target.id));
+      }
+    });
+  },{rootMargin:'-25% 0px -65% 0px',threshold:0});
+  sections.forEach(s=>observer.observe(s));
+</script>
+</body>
+</html>

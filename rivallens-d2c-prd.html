@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RivalLens D2C — Product Requirements Document</title>
+  <style>
+    :root{
+      --bg:#f6f7f9;
+      --surface:#ffffff;
+      --surface-2:#fbfbfc;
+      --text:#17181a;
+      --muted:#6b7280;
+      --line:#e6e8ec;
+      --accent:#315efb;
+      --accent-soft:#eef3ff;
+      --success:#14804a;
+      --warning:#a15c00;
+      --danger:#b42318;
+      --radius:16px;
+      --shadow:0 10px 30px rgba(20,24,31,.06);
+      --max:1180px;
+    }
+
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color:var(--text);
+      background:var(--bg);
+      line-height:1.6;
+    }
+
+    a{color:inherit;text-decoration:none}
+    button{font:inherit}
+
+    .layout{
+      display:grid;
+      grid-template-columns:250px minmax(0,1fr);
+      gap:28px;
+      max-width:var(--max);
+      margin:0 auto;
+      padding:28px;
+    }
+
+    .sidebar{
+      position:sticky;
+      top:22px;
+      align-self:start;
+      background:var(--surface);
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:18px;
+      box-shadow:var(--shadow);
+    }
+
+    .brand{
+      padding:6px 8px 18px;
+      border-bottom:1px solid var(--line);
+      margin-bottom:14px;
+    }
+    .brand h2{font-size:18px;margin:0 0 3px;letter-spacing:-.02em}
+    .brand p{font-size:12px;color:var(--muted);margin:0;text-transform:uppercase;letter-spacing:.12em}
+
+    .nav a{
+      display:block;
+      padding:9px 10px;
+      border-radius:10px;
+      color:#444b55;
+      font-size:14px;
+      margin:2px 0;
+    }
+    .nav a:hover,.nav a.active{
+      background:var(--accent-soft);
+      color:var(--accent);
+    }
+
+    .doc{
+      min-width:0;
+    }
+
+    .hero{
+      background:linear-gradient(135deg,#ffffff 0%,#f7f9ff 100%);
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:40px;
+      box-shadow:var(--shadow);
+      margin-bottom:22px;
+    }
+    .eyebrow{
+      font-size:12px;
+      font-weight:700;
+      letter-spacing:.11em;
+      text-transform:uppercase;
+      color:var(--accent);
+      margin-bottom:12px;
+    }
+    h1{
+      font-size:44px;
+      line-height:1.08;
+      letter-spacing:-.045em;
+      margin:0 0 14px;
+    }
+    .hero p{
+      margin:0;
+      color:#505764;
+      font-size:17px;
+      max-width:760px;
+    }
+    .meta{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-top:24px;
+    }
+    .tag{
+      padding:7px 10px;
+      border-radius:999px;
+      background:var(--surface);
+      border:1px solid var(--line);
+      font-size:12px;
+      color:#4d5562;
+    }
+
+    .section{
+      background:var(--surface);
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:28px;
+      margin-bottom:18px;
+      box-shadow:0 6px 20px rgba(20,24,31,.035);
+      scroll-margin-top:24px;
+    }
+    .section h2{
+      margin:0 0 16px;
+      font-size:24px;
+      letter-spacing:-.025em;
+    }
+    .section h3{
+      margin:20px 0 8px;
+      font-size:17px;
+    }
+    .section p{margin:8px 0;color:#454c57}
+    .section ul{margin:10px 0 0;padding-left:20px}
+    .section li{margin:6px 0;color:#3f4650}
+
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:14px;
+    }
+    .card{
+      border:1px solid var(--line);
+      background:var(--surface-2);
+      border-radius:14px;
+      padding:18px;
+    }
+    .card h4{margin:0 0 6px;font-size:15px}
+    .card p{margin:0;font-size:14px;color:var(--muted)}
+
+    .summary-grid{
+      display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:12px;
+      margin-top:22px;
+    }
+    .metric{
+      background:var(--surface);
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:15px;
+    }
+    .metric small{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}
+    .metric strong{font-size:15px}
+
+    .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px}
+    table{
+      width:100%;
+      border-collapse:collapse;
+      min-width:760px;
+      font-size:14px;
+      background:#fff;
+    }
+    th,td{
+      padding:12px 14px;
+      border-bottom:1px solid var(--line);
+      vertical-align:top;
+      text-align:left;
+    }
+    th{
+      background:#f7f8fa;
+      color:#4d5562;
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+    }
+    tr:last-child td{border-bottom:none}
+
+    .story{
+      border:1px solid var(--line);
+      border-radius:13px;
+      margin:10px 0;
+      overflow:hidden;
+      background:#fff;
+    }
+    .story button{
+      width:100%;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:15px 16px;
+      border:0;
+      background:#fff;
+      cursor:pointer;
+      text-align:left;
+      color:var(--text);
+    }
+    .story button:hover{background:#fafbfc}
+    .story-title{font-weight:650}
+    .story-id{
+      display:inline-block;
+      margin-right:9px;
+      color:var(--accent);
+      font-size:12px;
+      font-weight:700;
+    }
+    .story-body{
+      display:none;
+      padding:0 16px 16px;
+      color:#454c57;
+    }
+    .story.open .story-body{display:block}
+    .chev{transition:transform .2s ease;color:var(--muted)}
+    .story.open .chev{transform:rotate(180deg)}
+
+    .req{
+      display:grid;
+      grid-template-columns:70px minmax(0,1fr) 110px;
+      gap:12px;
+      padding:12px 0;
+      border-bottom:1px solid var(--line);
+      align-items:start;
+    }
+    .req:last-child{border-bottom:0}
+    .req-id{font-weight:700;color:#394150}
+    .priority{
+      justify-self:end;
+      font-size:12px;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:#fafafa;
+    }
+    .priority.high{color:var(--danger);background:#fff4f2;border-color:#ffd8d1}
+    .priority.medium{color:var(--warning);background:#fff8ec;border-color:#ffe1b3}
+
+    .callout{
+      border-left:3px solid var(--accent);
+      background:var(--accent-soft);
+      padding:14px 16px;
+      border-radius:10px;
+      margin:14px 0;
+      color:#334155;
+    }
+
+    .footer{
+      color:var(--muted);
+      font-size:12px;
+      text-align:center;
+      padding:8px 0 28px;
+    }
+
+    @media(max-width:900px){
+      .layout{grid-template-columns:1fr;padding:16px}
+      .sidebar{position:static}
+      .nav{display:flex;overflow:auto;gap:6px;padding-bottom:2px}
+      .nav a{white-space:nowrap}
+      .summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media(max-width:640px){
+      .hero{padding:26px}
+      h1{font-size:34px}
+      .section{padding:22px}
+      .grid,.summary-grid{grid-template-columns:1fr}
+      .req{grid-template-columns:58px minmax(0,1fr)}
+      .priority{grid-column:2;justify-self:start}
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">
+        <h2>RivalLens D2C</h2>
+        <p>Product Requirements Document</p>
+      </div>
+      <nav class="nav">
+        <a href="#overview">Overview</a>
+        <a href="#goals">Goals</a>
+        <a href="#users">Users</a>
+        <a href="#scope">Scope</a>
+        <a href="#stories">User Stories</a>
+        <a href="#requirements">Requirements</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#stack">Tech Stack</a>
+        <a href="#non-goals">Non-Goals</a>
+        <a href="#metrics">Success Metrics</a>
+        <a href="#questions">Open Questions</a>
+      </nav>
+    </aside>
+
+    <main class="doc">
+      <section class="hero" id="overview">
+        <div class="eyebrow">PRD · v0.1</div>
+        <h1>RivalLens D2C</h1>
+        <p>
+          An open-source competitive intelligence engine for direct-to-consumer brands that compares a user's own
+          website, offers, social content, and advertising against competitors and produces concise, evidence-backed
+          recommendations on what to improve or test next.
+        </p>
+        <div class="meta">
+          <span class="tag">Audience: D2C founders & growth teams</span>
+          <span class="tag">Status: Draft</span>
+          <span class="tag">MVP: Web + Social + Meta Ads</span>
+          <span class="tag">Primary output: Concise action report</span>
+        </div>
+        <div class="summary-grid">
+          <div class="metric"><small>Problem</small><strong>Competitor research is fragmented and manual.</strong></div>
+          <div class="metric"><small>Solution</small><strong>Normalize evidence across owned and rival channels.</strong></div>
+          <div class="metric"><small>Differentiator</small><strong>Compare competitors directly against the user's brand.</strong></div>
+          <div class="metric"><small>Viability</small><strong>84 / 100</strong></div>
+        </div>
+      </section>
+
+      <section class="section" id="goals">
+        <h2>1. Goals</h2>
+        <div class="grid">
+          <div class="card"><h4>Actionable intelligence</h4><p>Tell users what competitors are doing, what appears to work, and what to test next.</p></div>
+          <div class="card"><h4>Direct comparison</h4><p>Use the user's own D2C site and connected first-party data as the baseline.</p></div>
+          <div class="card"><h4>Cross-source evidence</h4><p>Combine site, product, pricing, social, customer feedback, and ad signals.</p></div>
+          <div class="card"><h4>Concise reporting</h4><p>Keep reports focused on advantages, disadvantages, working patterns, and next actions.</p></div>
+        </div>
+      </section>
+
+      <section class="section" id="users">
+        <h2>2. Target Users</h2>
+        <ul>
+          <li>D2C founders evaluating direct competitors.</li>
+          <li>Growth and performance-marketing teams.</li>
+          <li>E-commerce operators responsible for pricing, offers, and conversion.</li>
+          <li>Brand/content teams studying competitor creative strategy.</li>
+        </ul>
+        <div class="callout">V1 is intentionally D2C-only. B2B/SaaS versions should be separate future product variants rather than mixed into this data model.</div>
+      </section>
+
+      <section class="section" id="scope">
+        <h2>3. MVP Scope & Data Sources</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Source</th><th>Collected data</th><th>How RivalLens uses it</th></tr></thead>
+            <tbody>
+              <tr><td>User website</td><td>Positioning, products, pricing, offers, bundles, subscriptions, guarantees, shipping thresholds, PDP structure.</td><td>Build the baseline for direct comparison.</td></tr>
+              <tr><td>Competitor websites</td><td>Homepage copy, products, pricing, promotions, bundles, subscriptions, reviews, landing pages, site changes.</td><td>Identify gaps, stronger offers, positioning shifts, and product changes.</td></tr>
+              <tr><td>Instagram</td><td>Public professional-account posts, Reels, captions, media types, likes, comments, views when available, posting frequency.</td><td>Find content patterns, hooks, topics, and engagement outliers.</td></tr>
+              <tr><td>X</td><td>Posts, media, topics, likes, replies, reposts, quotes, impressions where available, conversations.</td><td>Measure normalized content performance and customer response.</td></tr>
+              <tr><td>Meta Ads</td><td>Observed ad creatives, copy, headlines, format, offers, landing pages, start dates, creative variants.</td><td>Infer repeated creative concepts, offer strategy, and long-running concepts.</td></tr>
+              <tr><td>Reviews/comments</td><td>Recurring praise, complaints, objections, questions, feature requests.</td><td>Expose market pain points and positioning opportunities.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section" id="stories">
+        <h2>4. User Stories</h2>
+
+        <div class="story">
+          <button type="button"><span><span class="story-id">US-001</span><span class="story-title">Create a brand baseline</span></span><span class="chev">⌄</span></button>
+          <div class="story-body">
+            <p>As a D2C operator, I want RivalLens to analyze my site so competitor findings are compared against my actual positioning, pricing, products, and offers.</p>
+            <ul>
+              <li>User can submit a public D2C website URL.</li>
+              <li>System extracts homepage positioning, products, pricing, offers, bundles, shipping, guarantees, and subscription signals where present.</li>
+              <li>Extracted evidence is stored with source URL and timestamp.</li>
+              <li>Failures produce explicit source-level error states rather than invented data.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="story">
+          <button type="button"><span><span class="story-id">US-002</span><span class="story-title">Track competitor storefronts</span></span><span class="chev">⌄</span></button>
+          <div class="story-body">
+            <p>As a D2C operator, I want to monitor competitor websites so I can see meaningful product, offer, and positioning changes over time.</p>
+            <ul>
+              <li>User can add at least three competitors.</li>
+              <li>System creates historical snapshots and detects meaningful differences.</li>
+              <li>Changes are classified into pricing, offer, product, positioning, or conversion-related events.</li>
+              <li>Every event links back to evidence.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="story">
+          <button type="button"><span><span class="story-id">US-003</span><span class="story-title">Analyze competitor social performance</span></span><span class="chev">⌄</span></button>
+          <div class="story-body">
+            <p>As a growth marketer, I want competitor Instagram and X content normalized against each account's baseline so I can identify unusually strong or weak patterns.</p>
+            <ul>
+              <li>Posts are classified by topic, hook, format, CTA, and promotional intensity.</li>
+              <li>Engagement is normalized rather than ranked solely by raw likes.</li>
+              <li>Comments/replies can be clustered into recurring customer themes.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="story">
+          <button type="button"><span><span class="story-id">US-004</span><span class="story-title">Analyze Meta ad strategy</span></span><span class="chev">⌄</span></button>
+          <div class="story-body">
+            <p>As a performance marketer, I want to compare observed competitor Meta ad concepts so I can identify repeated creative angles and offers worth testing.</p>
+            <ul>
+              <li>Ads are classified by format, hook, angle, offer, CTA, landing page, and creative style.</li>
+              <li>Creative longevity is treated as an observational signal, not proof of ROAS.</li>
+              <li>Meta ingestion remains a replaceable connector.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="story">
+          <button type="button"><span><span class="story-id">US-005</span><span class="story-title">Receive a concise action report</span></span><span class="chev">⌄</span></button>
+          <div class="story-body">
+            <p>As a founder, I want a short report that tells me what matters without forcing me through a large analytics dashboard.</p>
+            <ul>
+              <li>Report contains exactly four primary sections: our advantages, competitor advantages, what appears to be working, and what to test next.</li>
+              <li>Recommendations distinguish observed facts from hypotheses.</li>
+              <li>Each major conclusion includes evidence and confidence.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="requirements">
+        <h2>5. Functional Requirements</h2>
+
+        <div class="req"><div class="req-id">FR-1</div><div>Allow users to add their own D2C brand URL and competitor URLs.</div><div class="priority high">High</div></div>
+        <div class="req"><div class="req-id">FR-2</div><div>Extract and normalize website positioning, products, pricing, offers, bundles, subscriptions, shipping, guarantees, and visible reviews.</div><div class="priority high">High</div></div>
+        <div class="req"><div class="req-id">FR-3</div><div>Create timestamped page and product snapshots for historical comparison.</div><div class="priority high">High</div></div>
+        <div class="req"><div class="req-id">FR-4</div><div>Support Instagram professional-account analysis through a replaceable connector.</div><div class="priority high">High</div></div>
+        <div class="req"><div class="req-id">FR-5</div><div>Support X public-content analysis and normalized performance metrics.</div><div class="priority medium">Medium</div></div>
+        <div class="req"><div class="req-id">FR-6</div><div>Support Meta ad ingestion without making unsupported claims about spend, ROAS, or conversions.</div><div class="priority high">High</div></div>
+        <div class="req"><div class="req-id">FR-7</div><div>Store raw evidence separately from derived observations, strategic signals, and recommendations.</div><div class="priority high">High</div></div>
+        <div class="req"><div class="req-id">FR-8</div><div>Generate cross-source signals only when supported by traceable evidence.</div><div class="priority high">High</div></div>
+        <div class="req"><div class="req-id">FR-9</div><div>Compare the user's brand directly against the selected competitor set.</div><div class="priority high">High</div></div>
+        <div class="req"><div class="req-id">FR-10</div><div>Generate concise four-part action reports with confidence and source traceability.</div><div class="priority high">High</div></div>
+      </section>
+
+      <section class="section" id="architecture">
+        <h2>6. Architecture</h2>
+        <div class="callout">
+          Core rule: facts are extracted first, metrics are computed second, and LLMs interpret structured evidence last. The model must never be the system of record.
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Layer</th><th>Responsibility</th></tr></thead>
+            <tbody>
+              <tr><td>Connectors</td><td>Website, Instagram, X, Meta Ads, and future first-party integrations.</td></tr>
+              <tr><td>Collection</td><td>Crawling, API retrieval, page snapshots, media capture, and scheduled synchronization.</td></tr>
+              <tr><td>Normalization</td><td>Convert heterogeneous inputs into shared evidence schemas.</td></tr>
+              <tr><td>Evidence store</td><td>Persist immutable source observations with URL/account identifiers and timestamps.</td></tr>
+              <tr><td>Analytics engines</td><td>Pricing, offer, creative, content, product, customer-feedback, and positioning analysis.</td></tr>
+              <tr><td>Signal engine</td><td>Combine independent evidence into confidence-scored strategic hypotheses.</td></tr>
+              <tr><td>Comparison engine</td><td>Compare user brand strengths/weaknesses against competitors.</td></tr>
+              <tr><td>Recommendation layer</td><td>Translate supported signals into concrete experiments or actions.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section" id="stack">
+        <h2>7. Recommended Tech Stack</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Component</th><th>Selected</th><th>Alternatives</th></tr></thead>
+            <tbody>
+              <tr><td>Language</td><td>TypeScript</td><td>Python</td></tr>
+              <tr><td>Web app/API</td><td>Next.js</td><td>React + Vite + Hono, NestJS</td></tr>
+              <tr><td>Database</td><td>PostgreSQL via Supabase</td><td>Neon, Railway Postgres, RDS</td></tr>
+              <tr><td>ORM</td><td>Drizzle</td><td>Prisma, Kysely, raw SQL</td></tr>
+              <tr><td>Crawling</td><td>Crawlee + Playwright</td><td>Firecrawl, Apify, Scrapy + Playwright</td></tr>
+              <tr><td>Managed scraping fallback</td><td>Firecrawl</td><td>Apify Actors, Browserbase</td></tr>
+              <tr><td>Background jobs</td><td>Trigger.dev</td><td>BullMQ + Redis, Temporal, Inngest</td></tr>
+              <tr><td>AI</td><td>OpenAI Node SDK / Responses API</td><td>Gemini, Claude, self-hosted models</td></tr>
+              <tr><td>Validation</td><td>Zod</td><td>Valibot, TypeBox</td></tr>
+              <tr><td>Vector search</td><td>pgvector</td><td>Qdrant, Pinecone, Weaviate</td></tr>
+              <tr><td>Object storage</td><td>Supabase Storage</td><td>S3, Cloudflare R2</td></tr>
+              <tr><td>Hosting</td><td>Vercel + Supabase</td><td>Cloudflare, Railway, Fly.io</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Why TypeScript-first</h3>
+        <p>RivalLens is primarily an orchestration, crawling, background-job, API, and web application, so one TypeScript codebase reduces deployment and maintenance complexity. Python should be added only if later versions require custom statistical or machine-learning pipelines that materially benefit from the Python ecosystem.</p>
+      </section>
+
+      <section class="section" id="non-goals">
+        <h2>8. Non-Goals</h2>
+        <ul>
+          <li>No B2B/SaaS competitive-intelligence model in V1.</li>
+          <li>No unsupported estimates of competitor revenue, ROAS, conversion rate, or ad spend.</li>
+          <li>No bypassing authentication, CAPTCHAs, access controls, or platform restrictions.</li>
+          <li>No claim that observed public patterns prove causal business success.</li>
+          <li>No large dashboard as the primary user experience.</li>
+          <li>No requirement to support every D2C platform or every social network at launch.</li>
+        </ul>
+      </section>
+
+      <section class="section" id="metrics">
+        <h2>9. Success Metrics</h2>
+        <ul>
+          <li>At least 90% of displayed strategic conclusions link to source evidence.</li>
+          <li>A first competitor report can be produced after adding the user brand and three competitors.</li>
+          <li>Meaningful site changes are separated from low-value DOM noise with an acceptable false-positive rate.</li>
+          <li>Users can understand the main competitive actions in under two minutes.</li>
+          <li>Reports remain concise and prioritize no more than a small set of material actions.</li>
+          <li>Connector failure for one platform does not prevent analysis from other available sources.</li>
+        </ul>
+      </section>
+
+      <section class="section" id="questions">
+        <h2>10. Open Questions</h2>
+        <ul>
+          <li>Which D2C category should be the initial test vertical: beauty, supplements, apparel, food/beverage, or another category?</li>
+          <li>Should Meta Ads V1 require manual Ad Library import, third-party data, or both?</li>
+          <li>Which first-party integration should come first after site analysis: Shopify, Meta Ads Manager, GA4, or Klaviyo?</li>
+          <li>What refresh cadence should be default for websites and social content?</li>
+          <li>What confidence threshold should be required before a strategic hypothesis appears in the main report?</li>
+        </ul>
+      </section>
+
+      <div class="footer">RivalLens D2C · PRD v0.1 · Draft</div>
+    </main>
+  </div>
+
+  <script>
+    document.querySelectorAll('.story button').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        btn.closest('.story').classList.toggle('open');
+      });
+    });
+
+    const links=[...document.querySelectorAll('.nav a')];
+    const sections=links.map(a=>document.querySelector(a.getAttribute('href'))).filter(Boolean);
+    const observer=new IntersectionObserver(entries=>{
+      entries.forEach(entry=>{
+        if(entry.isIntersecting){
+          links.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+entry.target.id));
+        }
+      });
+    },{rootMargin:'-25% 0px -65% 0px',threshold:0});
+    sections.forEach(s=>observer.observe(s));
+  </script>
+</body>
+</html>

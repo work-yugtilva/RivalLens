@@ -1,0 +1,14 @@
+{
+  "name": "@rivallens/connectors",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./website": "./src/website/index.ts"
+  },
+  "dependencies": {
+    "@rivallens/schemas": "workspace:*",
+    "cheerio": "^1.1.2",
+    "tldts": "^6.1.86"
+  }
+}

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RivalLens D2C — App Flow</title><style>
+:root{
+  --bg:#f6f7f9; --surface:#fff; --surface2:#fafbfc; --text:#17191e; --muted:#667085;
+  --line:#e4e7ec; --accent:#315efb; --accent2:#7c3aed; --soft:#eef3ff;
+  --green:#067647; --amber:#b54708; --red:#b42318; --code:#101828;
+  --radius:16px; --shadow:0 8px 28px rgba(16,24,40,.055); --max:1220px;
+}
+*{box-sizing:border-box} html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.58}
+a{color:inherit;text-decoration:none} code,pre{font-family:"SFMono-Regular",Consolas,monospace}
+.layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:26px;max-width:var(--max);margin:0 auto;padding:26px}
+.sidebar{position:sticky;top:20px;align-self:start;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:17px;box-shadow:var(--shadow);max-height:calc(100vh - 40px);overflow:auto}
+.brand{padding:6px 8px 15px;border-bottom:1px solid var(--line);margin-bottom:10px}
+.brand h2{font-size:17px;margin:0 0 3px;letter-spacing:-.02em}.brand p{font-size:10px;color:var(--muted);margin:0;text-transform:uppercase;letter-spacing:.12em}
+.nav a{display:block;padding:8px 10px;border-radius:9px;font-size:13px;color:#475467;margin:2px 0}
+.nav a:hover,.nav a.active{background:var(--soft);color:var(--accent)}
+.doc{min-width:0}.hero{background:linear-gradient(135deg,#fff,#f7f9ff);border:1px solid var(--line);border-radius:22px;padding:38px;box-shadow:var(--shadow);margin-bottom:20px}
+.kicker{font-size:11px;font-weight:750;letter-spacing:.11em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+h1{font-size:40px;line-height:1.08;letter-spacing:-.043em;margin:0 0 13px}.hero p{font-size:16px;color:#475467;max-width:820px;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.tag{font-size:11px;padding:6px 9px;border-radius:999px;background:#fff;border:1px solid var(--line);color:#475467}
+.section{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:26px;margin-bottom:17px;box-shadow:0 5px 18px rgba(16,24,40,.03);scroll-margin-top:22px}
+.section h2{margin:0 0 14px;font-size:23px;letter-spacing:-.025em}.section h3{margin:20px 0 8px;font-size:16px}.section p{margin:7px 0;color:#475467}.section ul,.section ol{padding-left:20px;margin:8px 0 0}.section li{margin:5px 0;color:#3f4755}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.card{border:1px solid var(--line);background:var(--surface2);border-radius:14px;padding:16px}.card h4{margin:0 0 5px;font-size:14px}.card p{margin:0;color:var(--muted);font-size:13px}
+.callout{background:var(--soft);border-left:3px solid var(--accent);padding:13px 15px;border-radius:10px;margin:13px 0;color:#344054}.warn{background:#fffaeb;border-left-color:#f79009}.ok{background:#ecfdf3;border-left-color:#12b76a}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px}table{width:100%;border-collapse:collapse;min-width:760px;background:#fff;font-size:13px}th,td{padding:11px 13px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:#f8f9fb;color:#475467;font-size:10px;text-transform:uppercase;letter-spacing:.05em}tr:last-child td{border-bottom:0}
+pre{background:var(--code);color:#f2f4f7;border-radius:14px;padding:17px;overflow:auto;font-size:12px;line-height:1.55;margin:13px 0}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}.node{border:1px solid var(--line);background:#fff;border-radius:11px;padding:9px 12px;font-size:12px;font-weight:650}.arrow{color:#98a2b3}
+.pill{font-size:10px;border-radius:999px;padding:4px 7px;border:1px solid var(--line);white-space:nowrap}.high{color:var(--red);background:#fff3f1}.med{color:var(--amber);background:#fff8eb}.good{color:var(--green);background:#ecfdf3}
+.footer{font-size:11px;color:var(--muted);text-align:center;padding:7px 0 24px}
+@media(max-width:900px){.layout{grid-template-columns:1fr;padding:15px}.sidebar{position:static;max-height:none}.nav{display:flex;overflow:auto;gap:4px}.nav a{white-space:nowrap}.grid3{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){.hero{padding:25px}h1{font-size:33px}.section{padding:20px}.grid2,.grid3{grid-template-columns:1fr}}
+</style></head>
+<body><div class="layout"><aside class="sidebar"><div class="brand"><h2>RivalLens D2C</h2><p>App Flow</p></div>
+<nav class="nav"><a href="#overview">Overview</a><a href="#onboarding">Onboarding</a><a href="#primary">Primary Flow</a><a href="#rival">Rival Exploration</a><a href="#compare">Comparison</a><a href="#opps">Opportunities</a><a href="#degraded">Degraded Flows</a><a href="#navigation">Navigation Rules</a><a href="#events">UX Events</a></nav></aside><main class="doc">
+<section class="hero" id="overview"><div class="kicker">App Flow · Senior Product Designer + Growth Perspective</div>
+<h1>RivalLens D2C — Application Flow</h1>
+<p>The product flow is designed around fast activation, recurring competitive monitoring, and progressively deeper analysis. The user should reach a useful website-based comparison before being asked to configure every optional integration.</p>
+<div class="meta"><span class="tag">Activation target: first report</span><span class="tag">Core loop: detect → compare → test</span><span class="tag">Secondary loop: explore evidence</span></div></section>
+
+<section class="section" id="onboarding"><h2>1. First-Run Onboarding</h2>
+<div class="flow"><span class="node">Sign up</span><span class="arrow">→</span><span class="node">Enter brand URL</span><span class="arrow">→</span><span class="node">Confirm extracted brand</span><span class="arrow">→</span><span class="node">Add 3–5 rivals</span><span class="arrow">→</span><span class="node">Start analysis</span><span class="arrow">→</span><span class="node">First report</span></div>
+<h3>Step details</h3>
+<div class="table-wrap"><table><thead><tr><th>Step</th><th>User action</th><th>System action</th><th>UX rule</th></tr></thead><tbody>
+<tr><td>1</td><td>Create account</td><td>Create organization/member</td><td>Do not ask company-size/persona questions yet.</td></tr>
+<tr><td>2</td><td>Enter D2C URL</td><td>Discover brand name, products, social links</td><td>Pre-fill instead of asking users to type what we can infer.</td></tr>
+<tr><td>3</td><td>Confirm/edit extracted info</td><td>Persist brand baseline configuration</td><td>One screen, minimal fields.</td></tr>
+<tr><td>4</td><td>Add competitors</td><td>Validate domains, discover sources</td><td>Allow pasted URLs and fast multi-add.</td></tr>
+<tr><td>5</td><td>Start analysis</td><td>Queue website analysis immediately</td><td>Optional social/ad connection can happen after activation.</td></tr>
+</tbody></table></div>
+</section>
+
+<section class="section" id="primary"><h2>2. Primary User Loop</h2>
+<pre>LOGIN
+  ↓
+OVERVIEW
+  ├── See your advantages
+  ├── See competitor advantages
+  ├── See what appears to be working
+  └── See what to test next
+        ↓
+Select insight/recommendation
+        ↓
+Evidence drawer / rival detail
+        ↓
+Compare against own brand
+        ↓
+Save test / dismiss / watch
+        ↓
+Return on next material change</pre>
+<div class="callout">The Overview is not a traditional KPI dashboard. It is the decision layer. Raw collection volume, crawl counts, and connector metrics belong in Settings/Evidence unless they affect trust.</div>
+</section>
+
+<section class="section" id="rival"><h2>3. Rival Exploration Flow</h2>
+<div class="flow"><span class="node">Rivals</span><span class="arrow">→</span><span class="node">Select brand</span><span class="arrow">→</span><span class="node">Summary</span><span class="arrow">→</span><span class="node">Choose lens</span><span class="arrow">→</span><span class="node">Inspect evidence</span></div>
+<div class="grid2">
+<div class="card"><h4>Summary</h4><p>Top active signals, latest material changes, strongest/weakest observed areas.</p></div>
+<div class="card"><h4>Storefront</h4><p>Products, pricing, offers, bundles, shipping, subscriptions, positioning.</p></div>
+<div class="card"><h4>Ads</h4><p>Creative concepts, offers, landing pages, repeated/long-running observed ads.</p></div>
+<div class="card"><h4>Instagram / X</h4><p>Content themes, formats, outliers, posting cadence, audience response.</p></div>
+<div class="card"><h4>Timeline</h4><p>Material changes across sources in chronological order.</p></div>
+<div class="card"><h4>Evidence</h4><p>Source-specific proof chain, snapshots, and extraction confidence.</p></div>
+</div></section>
+
+<section class="section" id="compare"><h2>4. Comparison Flow</h2>
+<pre>Compare
+  ↓
+Choose 1–4 rivals
+  ↓
+Choose lens
+  ├── Positioning
+  ├── Products
+  ├── Pricing / offers
+  ├── Ads
+  └── Social
+  ↓
+Comparison matrix
+  ↓
+Select difference
+  ↓
+Evidence drawer
+  ↓
+Create / save recommended test</pre>
+<p>The user's brand is always the first sticky column. Competitors are ordered by user preference, not by an opaque score.</p>
+</section>
+
+<section class="section" id="opps"><h2>5. Opportunities Flow</h2>
+<div class="flow"><span class="node">Opportunity list</span><span class="arrow">→</span><span class="node">Filter by lens/effort</span><span class="arrow">→</span><span class="node">Open opportunity</span><span class="arrow">→</span><span class="node">Review evidence</span><span class="arrow">→</span><span class="node">Save test</span></div>
+<div class="table-wrap"><table><thead><tr><th>Opportunity card field</th><th>Purpose</th></tr></thead><tbody>
+<tr><td>Action title</td><td>Concrete, testable next move.</td></tr>
+<tr><td>Why now</td><td>One-sentence rationale.</td></tr>
+<tr><td>Expected learning</td><td>What the company will learn if they run the test.</td></tr>
+<tr><td>Confidence</td><td>Strength of evidence, not probability of business success.</td></tr>
+<tr><td>Evidence</td><td>Number and diversity of supporting sources.</td></tr>
+<tr><td>Effort</td><td>Low / Medium / High heuristic to aid prioritization.</td></tr>
+</tbody></table></div></section>
+
+<section class="section" id="degraded"><h2>6. Degraded & Edge Flows</h2>
+<div class="grid2">
+<div class="card"><h4>Instagram unavailable</h4><p>Continue with website/X/ads. Show coverage gap; never block report generation.</p></div>
+<div class="card"><h4>Meta ad connector unavailable</h4><p>Offer manual Ad Library import or hide ad claims until data exists.</p></div>
+<div class="card"><h4>Site blocks crawler</h4><p>Surface source failure and let user retry/add a specific public URL.</p></div>
+<div class="card"><h4>No meaningful differences</h4><p>Say “No material changes detected” and surface the most recent verified baseline.</p></div>
+<div class="card"><h4>Low-confidence extraction</h4><p>Exclude from executive summary; display in evidence as “Needs review.”</p></div>
+<div class="card"><h4>Long-running analysis</h4><p>Return user to usable current report and update asynchronously when new data lands.</p></div>
+</div></section>
+
+<section class="section" id="navigation"><h2>7. Navigation Rules</h2>
+<ul>
+<li>Global nav contains only Overview, Rivals, Compare, Opportunities, Evidence, Settings.</li>
+<li>Lens tabs appear inside Rival/Compare context and preserve selection while the user explores.</li>
+<li>Evidence opens in a Sheet/Drawer whenever possible; deep source history can have a full page.</li>
+<li>Breadcrumbs appear only on nested competitor/evidence pages, not on top-level screens.</li>
+<li>Command search lets power users jump directly to a competitor, source, signal, or report.</li>
+</ul></section>
+
+<section class="section" id="events"><h2>8. UX Events to Instrument</h2>
+<div class="table-wrap"><table><thead><tr><th>Event</th><th>Why measure it</th></tr></thead><tbody>
+<tr><td>brand_analysis_started</td><td>Onboarding completion / activation funnel.</td></tr>
+<tr><td>first_report_viewed</td><td>Primary activation event.</td></tr>
+<tr><td>insight_evidence_opened</td><td>Trust/depth behavior.</td></tr>
+<tr><td>comparison_created</td><td>Core product engagement.</td></tr>
+<tr><td>opportunity_saved</td><td>Insight-to-action conversion.</td></tr>
+<tr><td>competitor_added</td><td>Expansion of monitoring set.</td></tr>
+<tr><td>connector_failed / recovered</td><td>Reliability and friction.</td></tr>
+</tbody></table></div></section>
+<div class="footer">RivalLens D2C · App Flow · v0.1</div></main></div>
+<script>
+const links=[...document.querySelectorAll('.nav a')];
+const sections=links.map(a=>document.querySelector(a.getAttribute('href'))).filter(Boolean);
+if('IntersectionObserver' in window){
+  const obs=new IntersectionObserver(entries=>entries.forEach(e=>{
+    if(e.isIntersecting) links.forEach(a=>a.classList.toggle('active',a.getAttribute('href')==='#'+e.target.id));
+  }),{rootMargin:'-25% 0px -65% 0px',threshold:0});
+  sections.forEach(s=>obs.observe(s));
+}
+</script>
+</body></html>

@@ -1,0 +1,9 @@
+{
+  "name": "@rivallens/db",
+  "version": "0.0.0",
+  "private": true,
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "drizzle-orm": "^0.44.5"
+  }
+}
