@@ -26,3 +26,8 @@ export {
   generateRecommendedExperiments,
   type GenerateRecommendedExperimentsInput,
 } from './experiments';
+
+export {
+  resolveCurrentRecommendedExperiments,
+  type ResolveCurrentRecommendedExperimentsInput,
+} from './current-experiments';

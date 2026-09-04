@@ -669,8 +669,9 @@ function sortedUniqueCurrentSignalDependencies(
   return dependencies.every(
     (dependency, index) =>
       index === 0 ||
-      currentCompetitiveSignalIdentityKey(dependencies[index - 1]!) <
+      currentCompetitiveSignalIdentityKey(dependencies[index - 1]!).localeCompare(
         currentCompetitiveSignalIdentityKey(dependency),
+      ) < 0,
   );
 }
 
@@ -1149,6 +1150,80 @@ const persistedRecommendedExperimentVariantSchemas = [
 export const recommendedExperimentSchema = z
   .discriminatedUnion('experimentType', persistedRecommendedExperimentVariantSchemas)
   .superRefine(refineRecommendedExperiment);
+
+export const currentRecommendedExperimentLogicalIdentitySchema = z
+  .object({
+    ownedBrandId: uuid,
+    competitorId: uuid,
+    experimentType: recommendedExperimentTypeSchema,
+    hypothesisType: strategicHypothesisTypeSchema.exclude([
+      'competitor_may_combine_purchase_friction_and_repeat_purchase_incentives',
+    ]),
+  })
+  .strict();
+
+export const currentRecommendedExperimentUnresolvedSchema = z
+  .object({
+    logicalIdentity: currentRecommendedExperimentLogicalIdentitySchema,
+    state: z.literal('unknown'),
+    reason: z.literal('hypothesis_unresolved'),
+    unresolvedHypothesisDependency: currentStrategicHypothesisUnresolvedSchema,
+  })
+  .strict()
+  .refine(
+    ({ logicalIdentity, unresolvedHypothesisDependency }) => {
+      const dependency = unresolvedHypothesisDependency.logicalIdentity;
+      return (
+        logicalIdentity.ownedBrandId === dependency.ownedBrandId &&
+        logicalIdentity.competitorId === dependency.competitorId &&
+        logicalIdentity.hypothesisType === dependency.hypothesisType
+      );
+    },
+    { message: 'Unresolved hypothesis must match the experiment identity' },
+  );
+
+export const currentRecommendedExperimentGenerationNeededSchema = z
+  .object({
+    logicalIdentity: currentRecommendedExperimentLogicalIdentitySchema,
+    sourceHypothesisIds: z.array(uuid).min(1),
+    candidateExperimentHash: sha256Hash,
+    experimentEngineVersion: z.literal('recommended-experiments-v1'),
+  })
+  .strict()
+  .refine(
+    ({ sourceHypothesisIds }) =>
+      sourceHypothesisIds.every((id, index) => index === 0 || sourceHypothesisIds[index - 1]! < id),
+    { message: 'Source hypothesis IDs must be unique and sorted' },
+  );
+
+export const currentRecommendedExperimentsProjectionSchema = z
+  .object({
+    experimentEngineVersion: z.literal('recommended-experiments-v1'),
+    experiments: z.array(recommendedExperimentSchema),
+    unresolved: z.array(currentRecommendedExperimentUnresolvedSchema),
+    generationNeeded: z.array(currentRecommendedExperimentGenerationNeededSchema),
+  })
+  .strict()
+  .refine(
+    ({ experimentEngineVersion, experiments }) =>
+      experiments.every(
+        (experiment) => experiment.experimentEngineVersion === experimentEngineVersion,
+      ),
+    { message: 'Current experiments must use the supported experiment engine version' },
+  );
+
+export type CurrentRecommendedExperimentLogicalIdentity = z.infer<
+  typeof currentRecommendedExperimentLogicalIdentitySchema
+>;
+export type CurrentRecommendedExperimentUnresolved = z.infer<
+  typeof currentRecommendedExperimentUnresolvedSchema
+>;
+export type CurrentRecommendedExperimentGenerationNeeded = z.infer<
+  typeof currentRecommendedExperimentGenerationNeededSchema
+>;
+export type CurrentRecommendedExperimentsProjection = z.infer<
+  typeof currentRecommendedExperimentsProjectionSchema
+>;
 
 /** Compatibility alias for consumers that previously imported the generic signal contract. */
 export const signalSchema = competitiveSignalSchema;

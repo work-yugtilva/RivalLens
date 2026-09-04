@@ -1,9 +1,15 @@
 import 'server-only';
 
-import { generateRecommendedExperiments as generateRecommendedExperimentCandidates } from '@rivallens/intelligence';
+import {
+  generateRecommendedExperiments as generateRecommendedExperimentCandidates,
+  resolveCurrentRecommendedExperiments,
+} from '@rivallens/intelligence';
 import {
   recommendedExperimentCandidateSchema,
   recommendedExperimentSchema,
+  type CurrentRecommendedExperimentsProjection,
+  type CurrentStrategicHypothesesProjection,
+  type CompetitiveSignal,
   type RecommendedExperiment,
   type RecommendedExperimentCandidate,
 } from '@rivallens/schemas';
@@ -211,31 +217,120 @@ export type RecommendedExperimentsGenerateResult =
   | { status: 'brand_not_found' }
   | { status: 'competitors_not_found' };
 
-export async function generateRecommendedExperiments(
+async function loadCurrentExperimentInputs(
   supabase: SupabaseClient,
   input: { brandId: string; competitorIds: string[]; generatedAt: string },
-): Promise<RecommendedExperimentsGenerateResult> {
+): Promise<
+  | {
+      status: 'ok';
+      currentHypotheses: CurrentStrategicHypothesesProjection;
+      supportingSignals: CompetitiveSignal[];
+    }
+  | { status: 'brand_not_found' }
+  | { status: 'competitors_not_found' }
+> {
   const current = await loadCurrentStrategicHypotheses(supabase, input);
   if (current.status !== 'ok') return current;
-  if (current.projection.hypotheses.length === 0) return { status: 'ok', experiments: [] };
-
+  const requiredSignalIds = new Set(
+    current.projection.hypotheses.flatMap(({ supportingSignalIds }) => supportingSignalIds),
+  );
+  if (requiredSignalIds.size === 0) {
+    return { status: 'ok', currentHypotheses: current.projection, supportingSignals: [] };
+  }
   const historicalSignals = await loadHistoricalCompetitiveSignals(supabase, {
     brandId: input.brandId,
     competitorIds: input.competitorIds,
   });
   if (historicalSignals.status !== 'ok') return historicalSignals;
-  const requiredSignalIds = new Set(
-    current.projection.hypotheses.flatMap(({ supportingSignalIds }) => supportingSignalIds),
-  );
   const supportingSignals = historicalSignals.signals.filter(({ id }) => requiredSignalIds.has(id));
   if (supportingSignals.length !== requiredSignalIds.size) {
     throw new Error('Current strategic hypothesis lineage is incomplete.');
   }
+  return { status: 'ok', currentHypotheses: current.projection, supportingSignals };
+}
 
+export async function generateRecommendedExperiments(
+  supabase: SupabaseClient,
+  input: { brandId: string; competitorIds: string[]; generatedAt: string },
+): Promise<RecommendedExperimentsGenerateResult> {
+  const current = await loadCurrentExperimentInputs(supabase, input);
+  if (current.status !== 'ok') return current;
   const candidates = generateRecommendedExperimentCandidates({
-    currentHypotheses: current.projection.hypotheses,
-    supportingSignals,
+    currentHypotheses: current.currentHypotheses.hypotheses,
+    supportingSignals: current.supportingSignals,
     generatedAt: input.generatedAt,
   });
   return { status: 'ok', experiments: await persistExperiments(candidates) };
+}
+
+export async function loadHistoricalRecommendedExperiments(
+  supabase: SupabaseClient,
+  input: { brandId: string; competitorIds: string[] },
+): Promise<RecommendedExperimentsGenerateResult> {
+  const { data: brand, error: brandError } = await supabase
+    .from('brands')
+    .select('id')
+    .eq('id', input.brandId)
+    .maybeSingle();
+  if (brandError) throw new Error(brandError.message);
+  if (!brand) return { status: 'brand_not_found' };
+
+  const { data: competitors, error: competitorsError } = await supabase
+    .from('competitors')
+    .select('id')
+    .eq('brand_id', input.brandId)
+    .in('id', input.competitorIds);
+  if (competitorsError) throw new Error(competitorsError.message);
+  if (!competitors || competitors.length !== input.competitorIds.length) {
+    return { status: 'competitors_not_found' };
+  }
+  const { data: experimentRows, error: experimentError } = await supabase
+    .from('recommended_experiments')
+    .select(
+      'id, owned_brand_id, competitor_id, experiment_type, title, objective, hypothesis_under_test, design, control_configuration, treatment_configuration, primary_metric, guardrail_metrics, duration_planning, implementation_notes, confidence_level, confidence_basis, caveat_category, caveat_statement, generated_at, experiment_engine_version, generation_provenance, experiment_hash',
+    )
+    .eq('owned_brand_id', input.brandId)
+    .in('competitor_id', input.competitorIds)
+    .order('generated_at', { ascending: false })
+    .order('id', { ascending: false });
+  if (experimentError) throw new Error(experimentError.message);
+  const experimentIds = (experimentRows ?? []).map(({ id }) => id);
+  if (experimentIds.length === 0) return { status: 'ok', experiments: [] };
+  const { data: hypothesisRows, error: hypothesisError } = await supabase
+    .from('recommended_experiment_hypotheses')
+    .select('experiment_id, position, hypothesis_id')
+    .in('experiment_id', experimentIds)
+    .order('experiment_id', { ascending: true })
+    .order('position', { ascending: true });
+  if (hypothesisError) throw new Error(hypothesisError.message);
+  return {
+    status: 'ok',
+    experiments: hydrateExperimentRows({
+      experimentRows: experimentRows ?? [],
+      hypothesisRows: hypothesisRows ?? [],
+    }),
+  };
+}
+
+export async function loadCurrentRecommendedExperiments(
+  supabase: SupabaseClient,
+  input: { brandId: string; competitorIds: string[]; generatedAt: string },
+): Promise<
+  | { status: 'ok'; projection: CurrentRecommendedExperimentsProjection }
+  | { status: 'brand_not_found' }
+  | { status: 'competitors_not_found' }
+> {
+  const current = await loadCurrentExperimentInputs(supabase, input);
+  if (current.status !== 'ok') return current;
+  const history = await loadHistoricalRecommendedExperiments(supabase, input);
+  if (history.status !== 'ok') return history;
+  return {
+    status: 'ok',
+    projection: resolveCurrentRecommendedExperiments({
+      currentHypotheses: current.currentHypotheses,
+      supportingSignals: current.supportingSignals,
+      historicalExperiments: history.experiments,
+      generatedAt: input.generatedAt,
+    }),
+  };
 }
