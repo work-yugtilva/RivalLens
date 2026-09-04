@@ -3,6 +3,7 @@ import type { BrandComparisonResult, ObservedChange } from '../../packages/schem
 import type { SubjectSourceEvidence } from '../../packages/domain/src';
 import {
   enrichObservedChanges,
+  hydrateSignalRows,
   hydratePersistedSignals,
 } from '../../apps/web/src/lib/internal/competitive-signals';
 
@@ -390,6 +391,18 @@ describe('hydratePersistedSignals', () => {
         confidence: 0.8,
       },
     ]);
+  });
+
+  it('hydrates older detector versions for immutable history reads', () => {
+    const persisted = input();
+    persisted.signalRows[0] = {
+      ...(persisted.signalRows[0] as Record<string, unknown>),
+      rule_version: 'competitive-signals-v0',
+    };
+
+    expect(
+      hydrateSignalRows({ signalRows: persisted.signalRows, evidenceRows: persisted.evidenceRows }),
+    ).toMatchObject([{ id: signalId, ruleVersion: 'competitive-signals-v0' }]);
   });
 
   it('hydrates persisted prior-evaluation and current evidence with their lineage intact', () => {

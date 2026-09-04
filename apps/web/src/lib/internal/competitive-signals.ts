@@ -7,15 +7,18 @@ import {
 } from '@rivallens/domain';
 import {
   detectCompetitiveSignals,
+  resolveCurrentCompetitiveSignals,
   type EvidenceEnrichedObservedChange,
 } from '@rivallens/intelligence';
 import {
   competitiveSignalSchema,
   observedChangeSchema,
+  currentCompetitiveSignalsProjectionSchema,
   type BrandComparisonResult,
   type CompetitiveSignalCandidate,
   type CompetitiveSignal,
   type CompetitiveSignalEvidenceReference,
+  type CurrentCompetitiveSignalsProjection,
   type ObservedChange,
 } from '@rivallens/schemas';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -103,16 +106,36 @@ export function hydratePersistedSignals(input: {
   evidenceRows: unknown;
 }): CompetitiveSignal[] {
   const rpcRows = validatePersistedSignalRpcRows(input.expectedSignalHashes, input.rpcRows);
+  const signals = hydrateSignalRows({ signalRows: input.signalRows, evidenceRows: input.evidenceRows });
+  const signalsById = new Map(signals.map((signal) => [signal.id, signal]));
+
+  if (
+    signalsById.size !== rpcRows.length ||
+    rpcRows.some((row) => signalsById.get(row.id)?.signalHash !== row.signal_hash)
+  ) {
+    throw new Error('Competitive signal readback returned a mismatched result.');
+  }
+
+  return rpcRows
+    .map((rpcRow) => {
+      const signal = signalsById.get(rpcRow.id);
+      if (!signal) throw new Error('Competitive signal readback returned a missing signal.');
+      return signal;
+    })
+    .sort((left, right) => left.signalHash.localeCompare(right.signalHash));
+}
+
+export function hydrateSignalRows(input: {
+  signalRows: unknown;
+  evidenceRows: unknown;
+}): CompetitiveSignal[] {
   const signalRows = z.array(persistedSignalRowSchema).parse(input.signalRows);
   const evidenceRows = z.array(persistedSignalEvidenceRowSchema).parse(input.evidenceRows);
-  const rpcById = new Map(rpcRows.map((row) => [row.id, row]));
   const signalsById = new Map(signalRows.map((row) => [row.id, row]));
 
   if (
     signalsById.size !== signalRows.length ||
-    signalsById.size !== rpcRows.length ||
-    signalRows.some((row) => rpcById.get(row.id)?.signal_hash !== row.signal_hash) ||
-    evidenceRows.some((row) => !rpcById.has(row.signal_id))
+    evidenceRows.some((row) => !signalsById.has(row.signal_id))
   ) {
     throw new Error('Competitive signal readback returned a mismatched result.');
   }
@@ -130,10 +153,8 @@ export function hydratePersistedSignals(input: {
     references.sort((left, right) => left.position - right.position);
   }
 
-  return rpcRows
-    .map((rpcRow) => {
-      const signal = signalsById.get(rpcRow.id);
-      if (!signal) throw new Error('Competitive signal readback returned a missing signal.');
+  return signalRows
+    .map((signal) => {
       return competitiveSignalSchema.parse({
         id: signal.id,
         ownedBrandId: signal.owned_brand_id,
@@ -160,8 +181,7 @@ export function hydratePersistedSignals(input: {
         signalHash: signal.signal_hash,
         ...(signal.direction ? { direction: signal.direction } : {}),
       });
-    })
-    .sort((left, right) => left.signalHash.localeCompare(right.signalHash));
+    });
 }
 
 function latestEvaluatedSources(
@@ -455,6 +475,100 @@ export type CompetitiveSignalsLoadResult =
   | { status: 'ok'; signals: CompetitiveSignal[] }
   | { status: 'brand_not_found' }
   | { status: 'competitors_not_found' };
+
+export type CurrentCompetitiveSignalsLoadResult =
+  | { status: 'ok'; projection: CurrentCompetitiveSignalsProjection }
+  | { status: 'brand_not_found' }
+  | { status: 'competitors_not_found' };
+
+async function loadHistoricalSignalsForAuthorizedBrand(
+  supabase: SupabaseClient,
+  input: { brandId: string; competitorIds?: string[] },
+): Promise<CompetitiveSignalsLoadResult> {
+  const { data: brand, error: brandError } = await supabase
+    .from('brands')
+    .select('id')
+    .eq('id', input.brandId)
+    .maybeSingle();
+  if (brandError) throw new Error(brandError.message);
+  if (!brand) return { status: 'brand_not_found' };
+
+  if (input.competitorIds && input.competitorIds.length > 0) {
+    const { data: competitors, error: competitorsError } = await supabase
+      .from('competitors')
+      .select('id')
+      .eq('brand_id', input.brandId)
+      .in('id', input.competitorIds);
+    if (competitorsError) throw new Error(competitorsError.message);
+    if (!competitors || competitors.length !== input.competitorIds.length) {
+      return { status: 'competitors_not_found' };
+    }
+  }
+
+  let signalQuery = supabase
+    .from('competitive_signals')
+    .select(
+      'id, owned_brand_id, competitor_id, signal_type, comparison_key, statement, supporting_values, confidence, direction, generated_at, rule_version, signal_hash',
+    )
+    .eq('owned_brand_id', input.brandId)
+    .order('generated_at', { ascending: false })
+    .order('id', { ascending: false });
+  if (input.competitorIds && input.competitorIds.length > 0) {
+    signalQuery = signalQuery.in('competitor_id', input.competitorIds);
+  }
+  const { data: signalRows, error: signalError } = await signalQuery;
+  if (signalError) throw new Error(signalError.message);
+  const signalIds = (signalRows ?? []).map((signal) => signal.id);
+  if (signalIds.length === 0) return { status: 'ok', signals: [] };
+
+  const { data: evidenceRows, error: evidenceError } = await supabase
+    .from('competitive_signal_evidence')
+    .select(
+      'signal_id, position, role, source_id, snapshot_id, observation_id, prior_snapshot_id, prior_observation_id, observed_change_id, confidence',
+    )
+    .in('signal_id', signalIds)
+    .order('signal_id', { ascending: true })
+    .order('position', { ascending: true });
+  if (evidenceError) throw new Error(evidenceError.message);
+
+  return {
+    status: 'ok',
+    signals: hydrateSignalRows({ signalRows: signalRows ?? [], evidenceRows: evidenceRows ?? [] }),
+  };
+}
+
+export async function loadHistoricalCompetitiveSignals(
+  supabase: SupabaseClient,
+  input: { brandId: string; competitorIds?: string[] },
+): Promise<CompetitiveSignalsLoadResult> {
+  return loadHistoricalSignalsForAuthorizedBrand(supabase, input);
+}
+
+export async function loadCurrentCompetitiveSignals(
+  supabase: SupabaseClient,
+  input: { brandId: string; competitorIds: string[]; generatedAt: string },
+): Promise<CurrentCompetitiveSignalsLoadResult> {
+  const { loadBrandComparison } = await import('./brand-comparison');
+  const loaded = await loadBrandComparison(supabase, input);
+  if (loaded.status !== 'ok') return loaded;
+
+  const historical = await loadHistoricalSignalsForAuthorizedBrand(supabase, {
+    brandId: input.brandId,
+    competitorIds: input.competitorIds,
+  });
+  if (historical.status !== 'ok') return historical;
+
+  return {
+    status: 'ok',
+    projection: currentCompetitiveSignalsProjectionSchema.parse(
+      resolveCurrentCompetitiveSignals({
+        comparison: loaded.value.comparison,
+        historicalSignals: historical.signals,
+        generatedAt: input.generatedAt,
+      }),
+    ),
+  };
+}
 
 export async function generateCompetitiveSignals(
   supabase: SupabaseClient,

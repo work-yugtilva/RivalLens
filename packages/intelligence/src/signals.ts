@@ -8,12 +8,19 @@ import {
   type CompetitiveSignalConfidence,
   type CompetitiveSignalDirection,
   type CompetitiveSignalEvidenceReference,
+  type CurrentCompetitiveSignalFamily,
+  type CurrentCompetitiveSignalLogicalIdentity,
+  type CurrentCompetitiveSignalsProjection,
   type CompetitiveSignalSupportingValues,
   type CompetitiveSignalType,
   type ObservedChange,
 } from '@rivallens/schemas';
 
 export const COMPETITIVE_SIGNAL_RULE_VERSION = 'competitive-signals-v1';
+export const CURRENT_COMPETITIVE_SIGNAL_RULE_VERSION = COMPETITIVE_SIGNAL_RULE_VERSION;
+export const SUPPORTED_CURRENT_COMPETITIVE_SIGNAL_RULE_VERSIONS = [
+  CURRENT_COMPETITIVE_SIGNAL_RULE_VERSION,
+] as const;
 
 export type EvidenceEnrichedObservedChange = {
   change: ObservedChange;
@@ -23,6 +30,12 @@ export type EvidenceEnrichedObservedChange = {
 export type DetectCompetitiveSignalsInput = {
   comparison: BrandComparisonResult;
   observedChanges: EvidenceEnrichedObservedChange[];
+  generatedAt: string;
+};
+
+export type ResolveCurrentCompetitiveSignalsInput = {
+  comparison: BrandComparisonResult;
+  historicalSignals: Array<Pick<CompetitiveSignalCandidate, 'ownedBrandId' | 'competitorId' | 'comparisonKey' | 'signalType' | 'ruleVersion'>>;
   generatedAt: string;
 };
 
@@ -904,33 +917,24 @@ function changeDrafts(input: DetectCompetitiveSignalsInput): SignalDraft[] {
   return drafts;
 }
 
-export function detectCompetitiveSignals(
-  input: DetectCompetitiveSignalsInput,
-): CompetitiveSignalCandidate[] {
+function comparisonDrafts(comparison: BrandComparisonResult): SignalDraft[] {
   const drafts: SignalDraft[] = [];
-  for (const competitor of input.comparison.competitors) {
-    drafts.push(
-      ...numericComparisonDrafts(input.comparison, competitor.subjectId, competitor.domain),
-    );
-    const subscription = subscriptionPresenceDraft(
-      input.comparison,
-      competitor.subjectId,
-      competitor.domain,
-    );
+  for (const competitor of comparison.competitors) {
+    drafts.push(...numericComparisonDrafts(comparison, competitor.subjectId, competitor.domain));
+    const subscription = subscriptionPresenceDraft(comparison, competitor.subjectId, competitor.domain);
     if (subscription) drafts.push(subscription);
-    drafts.push(...presenceDrafts(input.comparison, competitor.subjectId, competitor.domain));
-    const discount = percentageDiscountDraft(
-      input.comparison,
-      competitor.subjectId,
-      competitor.domain,
-    );
+    drafts.push(...presenceDrafts(comparison, competitor.subjectId, competitor.domain));
+    const discount = percentageDiscountDraft(comparison, competitor.subjectId, competitor.domain);
     if (discount) drafts.push(discount);
-    drafts.push(...positioningDrafts(input.comparison, competitor.subjectId, competitor.domain));
+    drafts.push(...positioningDrafts(comparison, competitor.subjectId, competitor.domain));
   }
-  drafts.push(...changeDrafts(input));
+  return drafts;
+}
+
+function finishedSignals(drafts: SignalDraft[], generatedAt: string): CompetitiveSignalCandidate[] {
   const signals = drafts
     .flatMap((draft) => {
-      const signal = finishSignal(draft, input.generatedAt);
+      const signal = finishSignal(draft, generatedAt);
       return signal ? [signal] : [];
     })
     .sort(
@@ -941,4 +945,134 @@ export function detectCompetitiveSignals(
         left.signalHash.localeCompare(right.signalHash),
     );
   return [...new Map(signals.map((signal) => [signal.signalHash, signal])).values()];
+}
+
+const RELATIVE_NUMERIC_SIGNAL_TYPES = new Set<CompetitiveSignalType>([
+  'competitor_lower_free_shipping_threshold',
+  'competitor_higher_free_shipping_threshold',
+  'competitor_longer_return_window',
+  'competitor_shorter_return_window',
+  'competitor_longer_guarantee_duration',
+  'competitor_shorter_guarantee_duration',
+  'competitor_higher_subscription_discount',
+  'competitor_lower_subscription_discount',
+  'competitor_higher_explicit_percentage_discount',
+  'competitor_lower_explicit_percentage_discount',
+]);
+
+const PRESENCE_DIFFERENCE_SIGNAL_TYPES = new Set<CompetitiveSignalType>([
+  'competitor_offers_subscription_owned_does_not',
+  'owned_offers_subscription_competitor_does_not',
+  'competitor_offers_explicit_discount_owned_does_not',
+  'owned_offers_explicit_discount_competitor_does_not',
+  'competitor_offers_promotion_owned_does_not',
+  'owned_offers_promotion_competitor_does_not',
+  'competitor_offers_bundle_owned_does_not',
+  'owned_offers_bundle_competitor_does_not',
+  'competitor_offers_bogo_owned_does_not',
+  'owned_offers_bogo_competitor_does_not',
+]);
+
+export function currentCompetitiveSignalFamily(
+  signalType: CompetitiveSignalType,
+): CurrentCompetitiveSignalFamily | null {
+  if (RELATIVE_NUMERIC_SIGNAL_TYPES.has(signalType)) return 'relative_numeric';
+  if (PRESENCE_DIFFERENCE_SIGNAL_TYPES.has(signalType)) return 'presence_difference';
+  return signalType === 'positioning_differs' ? 'positioning_difference' : null;
+}
+
+export function currentCompetitiveSignalLogicalIdentity(
+  signal: Pick<CompetitiveSignalCandidate, 'ownedBrandId' | 'competitorId' | 'comparisonKey' | 'signalType'>,
+): CurrentCompetitiveSignalLogicalIdentity | null {
+  const signalFamily = currentCompetitiveSignalFamily(signal.signalType);
+  return signalFamily
+    ? {
+        ownedBrandId: signal.ownedBrandId,
+        competitorId: signal.competitorId,
+        comparisonKey: signal.comparisonKey,
+        signalFamily,
+      }
+    : null;
+}
+
+function logicalIdentityKey(identity: CurrentCompetitiveSignalLogicalIdentity): string {
+  return [
+    identity.ownedBrandId,
+    identity.competitorId,
+    identity.comparisonKey,
+    identity.signalFamily,
+  ].join(':');
+}
+
+function comparisonValue(
+  comparison: BrandComparisonResult,
+  comparisonKey: string,
+  subjectId: string,
+): ComparisonSubjectValue | undefined {
+  const matches = comparison.facts.filter((fact) => fact.key === comparisonKey);
+  return matches.length === 1 ? matches[0]?.valuesBySubjectId[subjectId] : undefined;
+}
+
+function isUnknown(value: ComparisonSubjectValue | undefined): boolean {
+  return !value || value.state === 'unknown';
+}
+
+function identityIsUnknown(
+  comparison: BrandComparisonResult,
+  identity: CurrentCompetitiveSignalLogicalIdentity,
+): boolean {
+  const owned = comparisonValue(comparison, identity.comparisonKey, identity.ownedBrandId);
+  const competitor = comparisonValue(comparison, identity.comparisonKey, identity.competitorId);
+  if (isUnknown(owned) || isUnknown(competitor)) return true;
+
+  if (
+    identity.signalFamily === 'relative_numeric' &&
+    identity.comparisonKey === 'subscription.discount'
+  ) {
+    return (
+      isUnknown(comparisonValue(comparison, 'subscription.available', identity.ownedBrandId)) ||
+      isUnknown(comparisonValue(comparison, 'subscription.available', identity.competitorId))
+    );
+  }
+  return false;
+}
+
+/**
+ * Resolves only enduring comparative conditions. Change-event signals stay in immutable history.
+ */
+export function resolveCurrentCompetitiveSignals(
+  input: ResolveCurrentCompetitiveSignalsInput,
+): CurrentCompetitiveSignalsProjection {
+  const signals = finishedSignals(comparisonDrafts(input.comparison), input.generatedAt).map((signal) => ({
+    ...signal,
+    ruleVersion: CURRENT_COMPETITIVE_SIGNAL_RULE_VERSION,
+  }));
+  const activeIdentities = new Set(
+    signals.flatMap((signal) => {
+      const identity = currentCompetitiveSignalLogicalIdentity(signal);
+      return identity ? [logicalIdentityKey(identity)] : [];
+    }),
+  );
+  const historicalIdentities = new Map<string, CurrentCompetitiveSignalLogicalIdentity>();
+  for (const signal of input.historicalSignals) {
+    if (signal.ruleVersion !== CURRENT_COMPETITIVE_SIGNAL_RULE_VERSION) continue;
+    const identity = currentCompetitiveSignalLogicalIdentity(signal);
+    if (identity) historicalIdentities.set(logicalIdentityKey(identity), identity);
+  }
+  const unresolved = [...historicalIdentities.entries()]
+    .filter(([key, identity]) => !activeIdentities.has(key) && identityIsUnknown(input.comparison, identity))
+    .map(([, logicalIdentity]) => ({ logicalIdentity, state: 'unknown' as const }))
+    .sort((left, right) => logicalIdentityKey(left.logicalIdentity).localeCompare(logicalIdentityKey(right.logicalIdentity)));
+
+  return {
+    ruleVersion: CURRENT_COMPETITIVE_SIGNAL_RULE_VERSION,
+    signals,
+    unresolved,
+  };
+}
+
+export function detectCompetitiveSignals(
+  input: DetectCompetitiveSignalsInput,
+): CompetitiveSignalCandidate[] {
+  return finishedSignals([...comparisonDrafts(input.comparison), ...changeDrafts(input)], input.generatedAt);
 }

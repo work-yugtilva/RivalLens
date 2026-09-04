@@ -434,6 +434,36 @@ export const competitiveSignalCandidateSchema = z
 
 export const competitiveSignalSchema = competitiveSignalCandidateSchema.extend({ id: uuid });
 
+export const currentCompetitiveSignalFamilySchema = z.enum([
+  'relative_numeric',
+  'presence_difference',
+  'positioning_difference',
+]);
+
+export const currentCompetitiveSignalLogicalIdentitySchema = z
+  .object({
+    ownedBrandId: uuid,
+    competitorId: uuid,
+    comparisonKey: z.string().min(1),
+    signalFamily: currentCompetitiveSignalFamilySchema,
+  })
+  .strict();
+
+export const currentCompetitiveSignalUnresolvedSchema = z
+  .object({
+    logicalIdentity: currentCompetitiveSignalLogicalIdentitySchema,
+    state: z.literal('unknown'),
+  })
+  .strict();
+
+export const currentCompetitiveSignalsProjectionSchema = z
+  .object({
+    ruleVersion: z.string().min(1),
+    signals: z.array(competitiveSignalCandidateSchema),
+    unresolved: z.array(currentCompetitiveSignalUnresolvedSchema),
+  })
+  .strict();
+
 /** Compatibility alias for consumers that previously imported the generic signal contract. */
 export const signalSchema = competitiveSignalSchema;
 
@@ -490,5 +520,15 @@ export type CompetitiveSignalSupportingValues = z.infer<
 >;
 export type CompetitiveSignalCandidate = z.infer<typeof competitiveSignalCandidateSchema>;
 export type CompetitiveSignal = z.infer<typeof competitiveSignalSchema>;
+export type CurrentCompetitiveSignalFamily = z.infer<typeof currentCompetitiveSignalFamilySchema>;
+export type CurrentCompetitiveSignalLogicalIdentity = z.infer<
+  typeof currentCompetitiveSignalLogicalIdentitySchema
+>;
+export type CurrentCompetitiveSignalUnresolved = z.infer<
+  typeof currentCompetitiveSignalUnresolvedSchema
+>;
+export type CurrentCompetitiveSignalsProjection = z.infer<
+  typeof currentCompetitiveSignalsProjectionSchema
+>;
 export type Signal = CompetitiveSignal;
 export type Report = z.infer<typeof reportSchema>;
