@@ -10,3 +10,12 @@ export {
   type EvidenceEnrichedObservedChange,
   type ResolveCurrentCompetitiveSignalsInput,
 } from './signals';
+
+export {
+  STRATEGIC_HYPOTHESIS_ENGINE_VERSION,
+  SUPPORTED_HYPOTHESIS_SIGNAL_RULE_VERSION,
+  generateStrategicHypotheses,
+  resolveCurrentStrategicHypotheses,
+  type GenerateStrategicHypothesesInput,
+  type ResolveCurrentStrategicHypothesesInput,
+} from './hypotheses';

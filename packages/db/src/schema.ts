@@ -72,6 +72,21 @@ export const competitiveSignalEvidenceRoleValues = [
   'evaluation',
 ] as const;
 
+export const strategicHypothesisTypeValues = [
+  'competitor_may_reduce_shipping_friction',
+  'competitor_may_reduce_perceived_purchase_risk',
+  'competitor_may_emphasize_repeat_purchase_mechanics',
+  'competitor_may_emphasize_promotional_incentives',
+  'competitor_may_combine_purchase_friction_and_repeat_purchase_incentives',
+] as const;
+export const strategicHypothesisConfidenceValues = ['medium', 'low'] as const;
+export const strategicHypothesisUncertaintyCategoryValues = [
+  'conversion_effect_not_established',
+  'retention_effect_not_established',
+  'promotion_impact_not_established',
+  'combined_business_impact_not_established',
+] as const;
+
 export const organizations = pgTable('organizations', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: text('name').notNull(),
@@ -439,5 +454,129 @@ export const competitiveSignalEvidence = pgTable(
       'competitive_signal_evidence_temporal_roles_have_observed_change',
       sql`${table.role} not in ('previous', 'previous_evaluation', 'current', 'evaluation') or ${table.observedChangeId} is not null`,
     ),
+  ],
+);
+
+export const strategicHypotheses = pgTable(
+  'strategic_hypotheses',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    ownedBrandId: uuid('owned_brand_id')
+      .notNull()
+      .references(() => brands.id, { onDelete: 'restrict' }),
+    competitorId: uuid('competitor_id').notNull(),
+    hypothesisType: text('hypothesis_type', { enum: strategicHypothesisTypeValues }).notNull(),
+    statement: text('statement').notNull(),
+    rationale: text('rationale').notNull(),
+    confidence: text('confidence', { enum: strategicHypothesisConfidenceValues }).notNull(),
+    uncertaintyCategory: text('uncertainty_category', {
+      enum: strategicHypothesisUncertaintyCategoryValues,
+    }).notNull(),
+    uncertaintyStatement: text('uncertainty_statement').notNull(),
+    generatedAt: timestamp('generated_at', { withTimezone: true }).notNull(),
+    hypothesisEngineVersion: text('hypothesis_engine_version').notNull(),
+    generationProvenance: jsonb('generation_provenance')
+      .$type<{
+        method: 'deterministic_template';
+        templateId: string;
+        sourceSignalRuleVersion: string;
+      }>()
+      .notNull(),
+    hypothesisHash: text('hypothesis_hash').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('strategic_hypotheses_owned_brand_id_generated_at_idx').on(
+      table.ownedBrandId,
+      table.generatedAt.desc(),
+    ),
+    index('strategic_hypotheses_competitor_id_generated_at_idx').on(
+      table.competitorId,
+      table.generatedAt.desc(),
+    ),
+    unique('strategic_hypotheses_owned_brand_id_hypothesis_hash_key').on(
+      table.ownedBrandId,
+      table.hypothesisHash,
+    ),
+    foreignKey({
+      columns: [table.competitorId, table.ownedBrandId],
+      foreignColumns: [competitors.id, competitors.brandId],
+      name: 'strategic_hypotheses_competitor_matches_brand_fk',
+    }),
+    check(
+      'strategic_hypotheses_hypothesis_type_allowed',
+      sql`${table.hypothesisType} in (
+        'competitor_may_reduce_shipping_friction',
+        'competitor_may_reduce_perceived_purchase_risk',
+        'competitor_may_emphasize_repeat_purchase_mechanics',
+        'competitor_may_emphasize_promotional_incentives',
+        'competitor_may_combine_purchase_friction_and_repeat_purchase_incentives'
+      )`,
+    ),
+    check(
+      'strategic_hypotheses_statement_not_blank',
+      sql`char_length(trim(${table.statement})) > 0`,
+    ),
+    check(
+      'strategic_hypotheses_rationale_not_blank',
+      sql`char_length(trim(${table.rationale})) > 0`,
+    ),
+    check(
+      'strategic_hypotheses_confidence_allowed',
+      sql`${table.confidence} in ('medium', 'low')`,
+    ),
+    check(
+      'strategic_hypotheses_uncertainty_category_allowed',
+      sql`${table.uncertaintyCategory} in (
+        'conversion_effect_not_established',
+        'retention_effect_not_established',
+        'promotion_impact_not_established',
+        'combined_business_impact_not_established'
+      )`,
+    ),
+    check(
+      'strategic_hypotheses_uncertainty_statement_not_blank',
+      sql`char_length(trim(${table.uncertaintyStatement})) > 0`,
+    ),
+    check(
+      'strategic_hypotheses_hypothesis_engine_version_not_blank',
+      sql`char_length(trim(${table.hypothesisEngineVersion})) > 0`,
+    ),
+    check(
+      'strategic_hypotheses_generation_provenance_valid',
+      sql`jsonb_typeof(${table.generationProvenance}) = 'object'
+        and ${table.generationProvenance} ?& array['method', 'templateId', 'sourceSignalRuleVersion']
+        and ${table.generationProvenance} - 'method' - 'templateId' - 'sourceSignalRuleVersion' = '{}'::jsonb
+        and ${table.generationProvenance} ->> 'method' = 'deterministic_template'
+        and char_length(trim(${table.generationProvenance} ->> 'templateId')) > 0
+        and char_length(trim(${table.generationProvenance} ->> 'sourceSignalRuleVersion')) > 0`,
+    ),
+    check(
+      'strategic_hypotheses_hypothesis_hash_sha256',
+      sql`${table.hypothesisHash} ~ '^sha256:[0-9a-f]{64}$'`,
+    ),
+  ],
+);
+
+export const strategicHypothesisSignals = pgTable(
+  'strategic_hypothesis_signals',
+  {
+    hypothesisId: uuid('hypothesis_id')
+      .notNull()
+      .references(() => strategicHypotheses.id, { onDelete: 'restrict' }),
+    position: smallint('position').notNull(),
+    signalId: uuid('signal_id')
+      .notNull()
+      .references(() => competitiveSignals.id, { onDelete: 'restrict' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.hypothesisId, table.position] }),
+    unique('strategic_hypothesis_signals_hypothesis_id_signal_id_key').on(
+      table.hypothesisId,
+      table.signalId,
+    ),
+    index('strategic_hypothesis_signals_signal_id_idx').on(table.signalId),
+    check('strategic_hypothesis_signals_position_nonnegative', sql`${table.position} >= 0`),
   ],
 );

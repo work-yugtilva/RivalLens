@@ -1,6 +1,6 @@
 begin;
 
-select plan(82);
+select plan(112);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -734,6 +734,377 @@ select is(
   )),
   0::bigint,
   'an invalid batch rolls back signals inserted earlier in the RPC call'
+);
+
+insert into public.competitors (brand_id, name, domain)
+values (current_setting('test.brand_one_id')::uuid, 'Rival one sibling', 'rival-one-sibling.test')
+returning id::text as sibling_competitor_id \gset
+select set_config('test.sibling_competitor_id', :'sibling_competitor_id', true);
+
+insert into public.competitive_signals (
+  owned_brand_id, competitor_id, signal_type, comparison_key, statement,
+  supporting_values, confidence, generated_at, rule_version, signal_hash
+) values
+  (
+    current_setting('test.brand_two_id')::uuid,
+    current_setting('test.competitor_two_id')::uuid,
+    'competitor_offers_subscription_owned_does_not',
+    'subscription.available',
+    'Rival two offers a subscription while its owned brand does not.',
+    '{"owned":false,"competitor":true}',
+    'medium',
+    now(),
+    'competitive-signals-v1',
+    'sha256:1212121212121212121212121212121212121212121212121212121212121212'
+  ),
+  (
+    current_setting('test.brand_one_id')::uuid,
+    current_setting('test.sibling_competitor_id')::uuid,
+    'competitor_offers_subscription_owned_does_not',
+    'subscription.available',
+    'Rival one sibling offers a subscription while its owned brand does not.',
+    '{"owned":false,"competitor":true}',
+    'medium',
+    now(),
+    'competitive-signals-v1',
+    'sha256:1313131313131313131313131313131313131313131313131313131313131313'
+  );
+
+select set_config(
+  'test.hypothesis_payload',
+  jsonb_build_array(
+    jsonb_build_object(
+      'hypothesisType', 'competitor_may_emphasize_repeat_purchase_mechanics',
+      'ownedBrandId', current_setting('test.brand_one_id'),
+      'competitorId', current_setting('test.competitor_one_id'),
+      'statement', 'Rival one may be emphasizing repeat-purchase mechanics.',
+      'rationale', 'Rival one offers a subscription that the owned brand does not.',
+      'supportingSignalIds', jsonb_build_array(
+        (select id from public.competitive_signals where signal_hash = 'sha256:8888888888888888888888888888888888888888888888888888888888888888')
+      ),
+      'confidence', 'low',
+      'uncertainty', jsonb_build_object(
+        'category', 'retention_effect_not_established',
+        'statement', 'Public evidence does not establish whether this improves retention.'
+      ),
+      'generatedAt', '2026-09-04T12:00:00.000Z',
+      'hypothesisEngineVersion', 'strategic-hypotheses-v1',
+      'generationProvenance', jsonb_build_object(
+        'method', 'deterministic_template',
+        'templateId', 'competitor_may_emphasize_repeat_purchase_mechanics',
+        'sourceSignalRuleVersion', 'competitive-signals-v1'
+      ),
+      'hypothesisHash', 'sha256:9999999999999999999999999999999999999999999999999999999999999999'
+    )
+  )::text,
+  true
+);
+
+set local role service_role;
+select is(
+  (select inserted from public.persist_strategic_hypotheses(current_setting('test.hypothesis_payload')::jsonb)),
+  true,
+  'service role can persist a strategic hypothesis'
+);
+select is(
+  (
+    select inserted
+    from public.persist_strategic_hypotheses(
+      jsonb_set(
+        current_setting('test.hypothesis_payload')::jsonb,
+        '{0,generatedAt}',
+        '"2026-09-05T12:00:00.000Z"'
+      )
+    )
+  ),
+  false,
+  'replaying a hypothesis identity ignores its generated timestamp'
+);
+
+set local role postgres;
+select is(
+  (select count(*) from public.strategic_hypotheses where hypothesis_hash = 'sha256:9999999999999999999999999999999999999999999999999999999999999999'),
+  1::bigint,
+  'idempotent hypothesis replay stores exactly one hypothesis row'
+);
+select is(
+  (
+    select count(*)
+    from public.strategic_hypothesis_signals
+    where hypothesis_id = (
+      select id from public.strategic_hypotheses
+      where hypothesis_hash = 'sha256:9999999999999999999999999999999999999999999999999999999999999999'
+    )
+  ),
+  1::bigint,
+  'idempotent hypothesis replay stores exactly one ordered signal set'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', true);
+select is((select count(*) from public.strategic_hypotheses), 1::bigint, 'member can select same-organization strategic hypotheses');
+select is((select count(*) from public.strategic_hypothesis_signals), 1::bigint, 'member can select same-organization strategic hypothesis signals');
+
+select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+select is((select count(*) from public.strategic_hypotheses), 0::bigint, 'cross-organization strategic hypotheses are invisible');
+select is((select count(*) from public.strategic_hypothesis_signals), 0::bigint, 'cross-organization strategic hypothesis signals are invisible');
+
+select set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', true);
+select throws_like(
+  $$ insert into public.strategic_hypotheses (
+       owned_brand_id, competitor_id, hypothesis_type, statement, rationale, confidence,
+       uncertainty_category, uncertainty_statement, generated_at,
+       hypothesis_engine_version, generation_provenance, hypothesis_hash
+     ) values (
+       current_setting('test.brand_one_id')::uuid, current_setting('test.competitor_one_id')::uuid,
+       'competitor_may_emphasize_repeat_purchase_mechanics', 'Denied hypothesis', 'Denied rationale', 'low',
+       'retention_effect_not_established', 'Impact is not established.', now(),
+       'strategic-hypotheses-v1',
+       '{"method":"deterministic_template","templateId":"repeat","sourceSignalRuleVersion":"competitive-signals-v1"}',
+       'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+     ) $$,
+  '%permission denied%',
+  'authenticated users cannot insert strategic hypotheses'
+);
+select throws_like(
+  $$ update public.strategic_hypotheses set statement = 'Denied update' $$,
+  '%permission denied%',
+  'authenticated users cannot update strategic hypotheses'
+);
+select throws_like(
+  $$ delete from public.strategic_hypotheses $$,
+  '%permission denied%',
+  'authenticated users cannot delete strategic hypotheses'
+);
+select throws_like(
+  $$ insert into public.strategic_hypothesis_signals (hypothesis_id, position, signal_id)
+     values (
+       (select id from public.strategic_hypotheses limit 1),
+       1,
+       (select id from public.competitive_signals where signal_hash = 'sha256:3333333333333333333333333333333333333333333333333333333333333333')
+     ) $$,
+  '%permission denied%',
+  'authenticated users cannot insert strategic hypothesis signals'
+);
+select throws_like(
+  $$ update public.strategic_hypothesis_signals set position = 1 $$,
+  '%permission denied%',
+  'authenticated users cannot update strategic hypothesis signals'
+);
+select throws_like(
+  $$ delete from public.strategic_hypothesis_signals $$,
+  '%permission denied%',
+  'authenticated users cannot delete strategic hypothesis signals'
+);
+select throws_like(
+  $$ select public.persist_strategic_hypotheses('[]'::jsonb) $$,
+  '%permission denied%',
+  'authenticated users cannot call the strategic hypothesis persistence RPC'
+);
+
+set local role postgres;
+select throws_like(
+  $$ update public.strategic_hypotheses set statement = 'Changed' where hypothesis_hash = 'sha256:9999999999999999999999999999999999999999999999999999999999999999' $$,
+  '%strategic_hypotheses are append-only%',
+  'strategic hypothesis updates are rejected for postgres'
+);
+select throws_like(
+  $$ delete from public.strategic_hypotheses where hypothesis_hash = 'sha256:9999999999999999999999999999999999999999999999999999999999999999' $$,
+  '%strategic_hypotheses are append-only%',
+  'strategic hypothesis deletes are rejected for postgres'
+);
+select throws_like(
+  $$ update public.strategic_hypothesis_signals set position = 1 $$,
+  '%strategic_hypothesis_signals are append-only%',
+  'strategic hypothesis signal updates are rejected for postgres'
+);
+select throws_like(
+  $$ delete from public.strategic_hypothesis_signals $$,
+  '%strategic_hypothesis_signals are append-only%',
+  'strategic hypothesis signal deletes are rejected for postgres'
+);
+select throws_like(
+  $$ insert into public.strategic_hypotheses (
+       owned_brand_id, competitor_id, hypothesis_type, statement, rationale, confidence,
+       uncertainty_category, uncertainty_statement, generated_at,
+       hypothesis_engine_version, generation_provenance, hypothesis_hash
+     ) values (
+       current_setting('test.brand_one_id')::uuid, current_setting('test.competitor_two_id')::uuid,
+       'competitor_may_emphasize_repeat_purchase_mechanics', 'Wrong tenant competitor', 'Invalid tenant association', 'low',
+       'retention_effect_not_established', 'Impact is not established.', now(),
+       'strategic-hypotheses-v1',
+       '{"method":"deterministic_template","templateId":"repeat","sourceSignalRuleVersion":"competitive-signals-v1"}',
+       'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+     ) $$,
+  '%strategic_hypotheses_competitor_matches_brand_fk%',
+  'strategic hypothesis competitors must belong to the owned brand'
+);
+
+set local role service_role;
+select throws_like(
+  $$ select public.persist_strategic_hypotheses(
+       jsonb_build_array(jsonb_set(
+         jsonb_set(
+           current_setting('test.hypothesis_payload')::jsonb -> 0,
+           '{hypothesisHash}',
+           '"sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"'
+         ),
+         '{supportingSignalIds}',
+         jsonb_build_array(
+           (select id from public.competitive_signals where signal_hash = 'sha256:1212121212121212121212121212121212121212121212121212121212121212')
+         )
+       ))
+     ) $$,
+  '%supporting signal must belong to the hypothesis brand%',
+  'strategic hypotheses reject cross-tenant supporting signal injection'
+);
+select throws_like(
+  $$ select public.persist_strategic_hypotheses(
+       jsonb_build_array(jsonb_set(
+         jsonb_set(
+           current_setting('test.hypothesis_payload')::jsonb -> 0,
+           '{hypothesisHash}',
+           '"sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"'
+         ),
+         '{supportingSignalIds}',
+         jsonb_build_array(
+           (select id from public.competitive_signals where signal_hash = 'sha256:1313131313131313131313131313131313131313131313131313131313131313')
+         )
+       ))
+     ) $$,
+  '%supporting signal must belong to the hypothesis competitor%',
+  'strategic hypotheses reject cross-competitor supporting signal injection'
+);
+select throws_like(
+  $$ select public.persist_strategic_hypotheses(
+       jsonb_build_array(jsonb_set(
+         jsonb_set(
+           current_setting('test.hypothesis_payload')::jsonb -> 0,
+           '{hypothesisHash}',
+           '"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"'
+         ),
+         '{generationProvenance,unexpected}',
+         'true'
+       ))
+     ) $$,
+  '%strategic_hypotheses_generation_provenance_valid%',
+  'strategic hypothesis persistence rejects non-strict generation provenance'
+);
+select throws_like(
+  $$ select public.persist_strategic_hypotheses(
+       jsonb_build_array(jsonb_set(
+         jsonb_set(
+           current_setting('test.hypothesis_payload')::jsonb -> 0,
+           '{hypothesisHash}',
+           '"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"'
+         ),
+         '{supportingSignalIds}',
+         '[]'::jsonb
+       ))
+     ) $$,
+  '%strategic hypothesis supporting signal IDs must be a non-empty JSON array%',
+  'strategic hypothesis persistence rejects an empty supporting signal set'
+);
+select is(
+  (
+    select inserted
+    from public.persist_strategic_hypotheses(
+      jsonb_build_array(jsonb_set(
+        jsonb_set(
+          current_setting('test.hypothesis_payload')::jsonb -> 0,
+          '{hypothesisHash}',
+          '"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"'
+        ),
+        '{supportingSignalIds}',
+        jsonb_build_array(
+          (select id from public.competitive_signals where signal_hash = 'sha256:3333333333333333333333333333333333333333333333333333333333333333')
+        )
+      ))
+    )
+  ),
+  true,
+  'new supporting signal evidence can create a later immutable hypothesis'
+);
+
+set local role postgres;
+select is(
+  (select count(*) from public.strategic_hypotheses where hypothesis_engine_version = 'strategic-hypotheses-v1'),
+  2::bigint,
+  'new supporting evidence creates a distinct hypothesis under the same engine version'
+);
+
+set local role service_role;
+select is(
+  (
+    select inserted
+    from public.persist_strategic_hypotheses(
+      jsonb_build_array(jsonb_set(
+        jsonb_set(
+          current_setting('test.hypothesis_payload')::jsonb -> 0,
+          '{hypothesisHash}',
+          '"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"'
+        ),
+        '{hypothesisEngineVersion}',
+        '"strategic-hypotheses-v2"'
+      ))
+    )
+  ),
+  true,
+  'a new hypothesis engine version can coexist with prior history'
+);
+
+set local role postgres;
+select is(
+  (
+    select count(*)
+    from public.strategic_hypotheses
+    join public.strategic_hypothesis_signals
+      on strategic_hypothesis_signals.hypothesis_id = strategic_hypotheses.id
+    where strategic_hypotheses.hypothesis_type = 'competitor_may_emphasize_repeat_purchase_mechanics'
+      and strategic_hypothesis_signals.signal_id = (
+        select id from public.competitive_signals
+        where signal_hash = 'sha256:8888888888888888888888888888888888888888888888888888888888888888'
+      )
+      and strategic_hypotheses.hypothesis_engine_version in ('strategic-hypotheses-v1', 'strategic-hypotheses-v2')
+  ),
+  2::bigint,
+  'the same supporting signal set is retained across engine versions'
+);
+
+set local role service_role;
+select throws_like(
+  $$ select public.persist_strategic_hypotheses(
+       jsonb_build_array(
+         jsonb_set(
+           current_setting('test.hypothesis_payload')::jsonb -> 0,
+           '{hypothesisHash}',
+           '"sha256:1111111111111111111111111111111111111111111111111111111111111111"'
+         ),
+         jsonb_set(
+           jsonb_set(
+             current_setting('test.hypothesis_payload')::jsonb -> 0,
+             '{hypothesisHash}',
+             '"sha256:2222222222222222222222222222222222222222222222222222222222222222"'
+           ),
+           '{supportingSignalIds}',
+           jsonb_build_array(
+             (select id from public.competitive_signals where signal_hash = 'sha256:1212121212121212121212121212121212121212121212121212121212121212')
+           )
+         )
+       )
+     ) $$,
+  '%supporting signal must belong to the hypothesis brand%',
+  'an invalid strategic hypothesis batch fails atomically'
+);
+
+set local role postgres;
+select is(
+  (select count(*) from public.strategic_hypotheses where hypothesis_hash in (
+    'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+    'sha256:2222222222222222222222222222222222222222222222222222222222222222'
+  )),
+  0::bigint,
+  'an invalid batch rolls back strategic hypotheses inserted earlier in the RPC call'
 );
 
 select * from finish();

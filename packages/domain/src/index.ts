@@ -2,7 +2,15 @@ import type { Observation, Report, Signal, Snapshot } from '@rivallens/schemas';
 
 export type { Observation, Report, Signal, Snapshot };
 
-export const evidenceChain = ['source', 'snapshot', 'observation', 'change', 'signal', 'recommendation', 'report'] as const;
+export const evidenceChain = [
+  'source',
+  'snapshot',
+  'observation',
+  'change',
+  'comparison',
+  'competitive_signal',
+  'strategic_hypothesis',
+] as const;
 
 export * from './observed-changes';
 export * from './current-state';

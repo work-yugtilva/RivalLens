@@ -464,6 +464,262 @@ export const currentCompetitiveSignalsProjectionSchema = z
   })
   .strict();
 
+export const strategicHypothesisTypeSchema = z.enum([
+  'competitor_may_reduce_shipping_friction',
+  'competitor_may_reduce_perceived_purchase_risk',
+  'competitor_may_emphasize_repeat_purchase_mechanics',
+  'competitor_may_emphasize_promotional_incentives',
+  'competitor_may_combine_purchase_friction_and_repeat_purchase_incentives',
+]);
+
+export const strategicHypothesisUncertaintyCategorySchema = z.enum([
+  'conversion_effect_not_established',
+  'retention_effect_not_established',
+  'promotion_impact_not_established',
+  'combined_business_impact_not_established',
+]);
+
+export const strategicHypothesisUncertaintySchema = z
+  .object({
+    category: strategicHypothesisUncertaintyCategorySchema,
+    statement: z.string().min(1),
+  })
+  .strict();
+
+export const strategicHypothesisGenerationProvenanceSchema = z
+  .object({
+    method: z.literal('deterministic_template'),
+    templateId: strategicHypothesisTypeSchema,
+    sourceSignalRuleVersion: z.literal('competitive-signals-v1'),
+  })
+  .strict();
+
+const historicalStrategicHypothesisGenerationProvenanceSchema = z
+  .object({
+    method: z.literal('deterministic_template'),
+    templateId: strategicHypothesisTypeSchema,
+    sourceSignalRuleVersion: z.string().min(1),
+  })
+  .strict();
+
+export const STRATEGIC_HYPOTHESIS_CANONICAL_COPY = {
+  competitor_may_reduce_shipping_friction: {
+    statement:
+      'The competitor may be using a lower free-shipping threshold to reduce purchase friction.',
+    rationale:
+      "A current competitive signal shows that the competitor's free-shipping threshold is lower than the owned brand's.",
+    uncertainty: {
+      category: 'conversion_effect_not_established',
+      statement: 'Public evidence does not establish whether this improves conversion.',
+    },
+  },
+  competitor_may_reduce_perceived_purchase_risk: {
+    statement:
+      'The competitor may be using a more permissive post-purchase policy to reduce perceived purchase risk.',
+    rationale:
+      'Current competitive signals show a longer return window or guarantee than the owned brand offers.',
+    uncertainty: {
+      category: 'conversion_effect_not_established',
+      statement: 'Public evidence does not establish whether this improves conversion.',
+    },
+  },
+  competitor_may_emphasize_repeat_purchase_mechanics: {
+    statement: 'The competitor may be emphasizing repeat-purchase mechanics.',
+    rationale:
+      'Current competitive signals show subscription availability that the owned brand lacks or a larger explicit subscription discount.',
+    uncertainty: {
+      category: 'retention_effect_not_established',
+      statement:
+        'Public evidence does not establish whether this improves retention or lifetime value.',
+    },
+  },
+  competitor_may_emphasize_promotional_incentives: {
+    statement: 'The competitor may be leaning more heavily on promotional incentives.',
+    rationale:
+      'Current competitive signals show explicit promotional mechanics that the owned brand lacks or a larger explicit percentage discount.',
+    uncertainty: {
+      category: 'promotion_impact_not_established',
+      statement: 'This indicates a promotional difference, not its business impact.',
+    },
+  },
+  competitor_may_combine_purchase_friction_and_repeat_purchase_incentives: {
+    statement:
+      'The competitor may be using several purchase-friction and repeat-purchase incentives simultaneously.',
+    rationale:
+      'Current competitive signals jointly show a lower free-shipping threshold, a longer return or guarantee policy, and subscription-related mechanics.',
+    uncertainty: {
+      category: 'combined_business_impact_not_established',
+      statement:
+        'Public evidence does not establish conversion, retention, or other business impact.',
+    },
+  },
+} as const satisfies Record<
+  z.infer<typeof strategicHypothesisTypeSchema>,
+  {
+    statement: string;
+    rationale: string;
+    uncertainty: z.infer<typeof strategicHypothesisUncertaintySchema>;
+  }
+>;
+
+const strategicHypothesisObjectSchema = z
+  .object({
+    hypothesisType: strategicHypothesisTypeSchema,
+    ownedBrandId: uuid,
+    competitorId: uuid,
+    statement: z.string().min(1),
+    rationale: z.string().min(1),
+    supportingSignalIds: z.array(uuid).min(1),
+    confidence: z.enum(['medium', 'low']),
+    uncertainty: strategicHypothesisUncertaintySchema,
+    generatedAt: timestamp,
+    hypothesisEngineVersion: z.string().min(1),
+    generationProvenance: historicalStrategicHypothesisGenerationProvenanceSchema,
+    hypothesisHash: sha256Hash,
+  })
+  .strict();
+
+function refineStrategicHypothesis(
+  hypothesis: z.infer<typeof strategicHypothesisObjectSchema>,
+  context: z.RefinementCtx,
+) {
+  if (hypothesis.hypothesisEngineVersion === 'strategic-hypotheses-v1') {
+    const copy = STRATEGIC_HYPOTHESIS_CANONICAL_COPY[hypothesis.hypothesisType];
+    if (hypothesis.statement !== copy.statement) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['statement'],
+        message: 'Hypothesis statement must match its deterministic template',
+      });
+    }
+    if (hypothesis.rationale !== copy.rationale) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['rationale'],
+        message: 'Hypothesis rationale must match its deterministic template',
+      });
+    }
+    if (
+      hypothesis.uncertainty.category !== copy.uncertainty.category ||
+      hypothesis.uncertainty.statement !== copy.uncertainty.statement
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['uncertainty'],
+        message: 'Hypothesis uncertainty must match its deterministic template',
+      });
+    }
+  }
+  if (hypothesis.generationProvenance.templateId !== hypothesis.hypothesisType) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['generationProvenance', 'templateId'],
+      message: 'Hypothesis template ID must match its hypothesis type',
+    });
+  }
+  if (
+    new Set(hypothesis.supportingSignalIds).size !== hypothesis.supportingSignalIds.length ||
+    hypothesis.supportingSignalIds.some(
+      (id, index) => index > 0 && id < hypothesis.supportingSignalIds[index - 1]!,
+    )
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['supportingSignalIds'],
+      message: 'Supporting signal IDs must be unique and sorted',
+    });
+  }
+}
+
+export const strategicHypothesisCandidateSchema = strategicHypothesisObjectSchema
+  .extend({
+    hypothesisEngineVersion: z.literal('strategic-hypotheses-v1'),
+    generationProvenance: strategicHypothesisGenerationProvenanceSchema,
+  })
+  .strict()
+  .superRefine(refineStrategicHypothesis);
+
+export const strategicHypothesisSchema = strategicHypothesisObjectSchema
+  .extend({ id: uuid })
+  .strict()
+  .superRefine(refineStrategicHypothesis);
+
+export const currentStrategicHypothesisLogicalIdentitySchema = z
+  .object({
+    ownedBrandId: uuid,
+    competitorId: uuid,
+    hypothesisType: strategicHypothesisTypeSchema,
+  })
+  .strict();
+
+function currentCompetitiveSignalIdentityKey(
+  identity: z.infer<typeof currentCompetitiveSignalLogicalIdentitySchema>,
+): string {
+  return [
+    identity.ownedBrandId,
+    identity.competitorId,
+    identity.comparisonKey,
+    identity.signalFamily,
+  ].join(':');
+}
+
+function sortedUniqueCurrentSignalDependencies(
+  dependencies: z.infer<typeof currentCompetitiveSignalLogicalIdentitySchema>[],
+): boolean {
+  return dependencies.every(
+    (dependency, index) =>
+      index === 0 ||
+      currentCompetitiveSignalIdentityKey(dependencies[index - 1]!) <
+        currentCompetitiveSignalIdentityKey(dependency),
+  );
+}
+
+export const currentStrategicHypothesisUnresolvedSchema = z
+  .object({
+    logicalIdentity: currentStrategicHypothesisLogicalIdentitySchema,
+    state: z.literal('unknown'),
+    unresolvedSignalDependencies: z
+      .array(currentCompetitiveSignalLogicalIdentitySchema)
+      .min(1),
+  })
+  .strict()
+  .refine(
+    (value) => sortedUniqueCurrentSignalDependencies(value.unresolvedSignalDependencies),
+    {
+      message: 'Unresolved signal dependencies must be unique and sorted',
+      path: ['unresolvedSignalDependencies'],
+    },
+  );
+
+export const currentStrategicHypothesisGenerationNeededSchema = z
+  .object({
+    logicalIdentity: currentStrategicHypothesisLogicalIdentitySchema,
+    supportingSignalIds: z.array(uuid).min(1),
+    candidateHypothesisHash: sha256Hash,
+    hypothesisEngineVersion: z.literal('strategic-hypotheses-v1'),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      new Set(value.supportingSignalIds).size === value.supportingSignalIds.length &&
+      value.supportingSignalIds.every(
+        (id, index) => index === 0 || value.supportingSignalIds[index - 1]! < id,
+      ),
+    {
+      message: 'Supporting signal IDs must be unique and sorted',
+      path: ['supportingSignalIds'],
+    },
+  );
+
+export const currentStrategicHypothesesProjectionSchema = z
+  .object({
+    hypothesisEngineVersion: z.literal('strategic-hypotheses-v1'),
+    hypotheses: z.array(strategicHypothesisSchema),
+    unresolved: z.array(currentStrategicHypothesisUnresolvedSchema),
+    generationNeeded: z.array(currentStrategicHypothesisGenerationNeededSchema),
+  })
+  .strict();
+
 /** Compatibility alias for consumers that previously imported the generic signal contract. */
 export const signalSchema = competitiveSignalSchema;
 
@@ -529,6 +785,30 @@ export type CurrentCompetitiveSignalUnresolved = z.infer<
 >;
 export type CurrentCompetitiveSignalsProjection = z.infer<
   typeof currentCompetitiveSignalsProjectionSchema
+>;
+export type StrategicHypothesisType = z.infer<typeof strategicHypothesisTypeSchema>;
+export type StrategicHypothesisUncertaintyCategory = z.infer<
+  typeof strategicHypothesisUncertaintyCategorySchema
+>;
+export type StrategicHypothesisUncertainty = z.infer<
+  typeof strategicHypothesisUncertaintySchema
+>;
+export type StrategicHypothesisGenerationProvenance = z.infer<
+  typeof strategicHypothesisGenerationProvenanceSchema
+>;
+export type StrategicHypothesisCandidate = z.infer<typeof strategicHypothesisCandidateSchema>;
+export type StrategicHypothesis = z.infer<typeof strategicHypothesisSchema>;
+export type CurrentStrategicHypothesisLogicalIdentity = z.infer<
+  typeof currentStrategicHypothesisLogicalIdentitySchema
+>;
+export type CurrentStrategicHypothesisUnresolved = z.infer<
+  typeof currentStrategicHypothesisUnresolvedSchema
+>;
+export type CurrentStrategicHypothesisGenerationNeeded = z.infer<
+  typeof currentStrategicHypothesisGenerationNeededSchema
+>;
+export type CurrentStrategicHypothesesProjection = z.infer<
+  typeof currentStrategicHypothesesProjectionSchema
 >;
 export type Signal = CompetitiveSignal;
 export type Report = z.infer<typeof reportSchema>;

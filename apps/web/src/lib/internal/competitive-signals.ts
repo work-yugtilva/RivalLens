@@ -481,6 +481,45 @@ export type CurrentCompetitiveSignalsLoadResult =
   | { status: 'brand_not_found' }
   | { status: 'competitors_not_found' };
 
+export type CurrentPersistedCompetitiveSignalsLoadResult =
+  | { status: 'ok'; signals: CompetitiveSignal[] }
+  | { status: 'brand_not_found' }
+  | { status: 'competitors_not_found' };
+
+export type CurrentPersistedCompetitiveSignalsProjectionLoadResult =
+  | {
+      status: 'ok';
+      projection: CurrentCompetitiveSignalsProjection;
+      currentSignals: CompetitiveSignal[];
+      historicalSignals: CompetitiveSignal[];
+    }
+  | { status: 'brand_not_found' }
+  | { status: 'competitors_not_found' };
+
+/**
+ * Resolves durable IDs for the accepted current-signal projection without
+ * persisting newly derived signals. A current candidate is usable by a
+ * downstream intelligence layer only when its evidence-derived hash already
+ * exists in immutable signal history.
+ */
+export function intersectCurrentPersistedSignals(input: {
+  projection: CurrentCompetitiveSignalsProjection;
+  historicalSignals: CompetitiveSignal[];
+}): CompetitiveSignal[] {
+  const persistedByHash = new Map(
+    input.historicalSignals.map((signal) => [signal.signalHash, signal]),
+  );
+
+  return input.projection.signals.flatMap((candidate) => {
+    const persisted = persistedByHash.get(candidate.signalHash);
+    return persisted &&
+      persisted.ownedBrandId === candidate.ownedBrandId &&
+      persisted.competitorId === candidate.competitorId
+      ? [persisted]
+      : [];
+  });
+}
+
 async function loadHistoricalSignalsForAuthorizedBrand(
   supabase: SupabaseClient,
   input: { brandId: string; competitorIds?: string[] },
@@ -567,6 +606,43 @@ export async function loadCurrentCompetitiveSignals(
         generatedAt: input.generatedAt,
       }),
     ),
+  };
+}
+
+export async function loadCurrentPersistedCompetitiveSignals(
+  supabase: SupabaseClient,
+  input: { brandId: string; competitorIds: string[]; generatedAt: string },
+): Promise<CurrentPersistedCompetitiveSignalsLoadResult> {
+  const loaded = await loadCurrentPersistedCompetitiveSignalsProjection(supabase, input);
+  if (loaded.status !== 'ok') return loaded;
+  return { status: 'ok', signals: loaded.currentSignals };
+}
+
+/**
+ * Retains the accepted current projection, its unresolved metadata, and the
+ * persisted signal lineage needed by downstream read-only intelligence views.
+ */
+export async function loadCurrentPersistedCompetitiveSignalsProjection(
+  supabase: SupabaseClient,
+  input: { brandId: string; competitorIds: string[]; generatedAt: string },
+): Promise<CurrentPersistedCompetitiveSignalsProjectionLoadResult> {
+  const current = await loadCurrentCompetitiveSignals(supabase, input);
+  if (current.status !== 'ok') return current;
+
+  const historical = await loadHistoricalCompetitiveSignals(supabase, {
+    brandId: input.brandId,
+    competitorIds: input.competitorIds,
+  });
+  if (historical.status !== 'ok') return historical;
+
+  return {
+    status: 'ok',
+    projection: current.projection,
+    currentSignals: intersectCurrentPersistedSignals({
+      projection: current.projection,
+      historicalSignals: historical.signals,
+    }),
+    historicalSignals: historical.signals,
   };
 }
 

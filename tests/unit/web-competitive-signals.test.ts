@@ -5,6 +5,7 @@ import {
   enrichObservedChanges,
   hydrateSignalRows,
   hydratePersistedSignals,
+  intersectCurrentPersistedSignals,
 } from '../../apps/web/src/lib/internal/competitive-signals';
 
 vi.mock('server-only', () => ({}));
@@ -468,6 +469,53 @@ describe('hydratePersistedSignals', () => {
     const invalid = input();
     invalid.rpcRows[0] = { id: signalId, signal_hash: hash, inserted: 'false' } as never;
     expect(() => hydratePersistedSignals(invalid)).toThrow();
+  });
+
+  it('resolves only persisted signals whose hashes are in the current projection', () => {
+    const persisted = hydratePersistedSignals(input())[0]!;
+    const { id, ...candidate } = persisted;
+    expect(id).toBe(signalId);
+    const historicalOnly = {
+      ...persisted,
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      signalHash: `sha256:${'c'.repeat(64)}`,
+    };
+
+    expect(
+      intersectCurrentPersistedSignals({
+        projection: {
+          ruleVersion: 'competitive-signals-v1',
+          signals: [candidate],
+          unresolved: [],
+        },
+        historicalSignals: [historicalOnly, persisted],
+      }),
+    ).toEqual([persisted]);
+  });
+
+  it('does not substitute history for an unresolved current identity', () => {
+    const persisted = hydratePersistedSignals(input())[0]!;
+
+    expect(
+      intersectCurrentPersistedSignals({
+        projection: {
+          ruleVersion: 'competitive-signals-v1',
+          signals: [],
+          unresolved: [
+            {
+              logicalIdentity: {
+                ownedBrandId: BRAND_ID,
+                competitorId: COMPETITOR_ID,
+                comparisonKey: persisted.comparisonKey,
+                signalFamily: 'presence_difference',
+              },
+              state: 'unknown',
+            },
+          ],
+        },
+        historicalSignals: [persisted],
+      }),
+    ).toEqual([]);
   });
 });
 
