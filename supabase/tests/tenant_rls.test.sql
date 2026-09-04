@@ -1,6 +1,6 @@
 begin;
 
-select plan(112);
+select plan(136);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -1106,6 +1106,177 @@ select is(
   0::bigint,
   'an invalid batch rolls back strategic hypotheses inserted earlier in the RPC call'
 );
+
+set local role postgres;
+insert into public.strategic_hypotheses (
+  owned_brand_id, competitor_id, hypothesis_type, statement, rationale, confidence,
+  uncertainty_category, uncertainty_statement, generated_at,
+  hypothesis_engine_version, generation_provenance, hypothesis_hash
+) values (
+  current_setting('test.brand_two_id')::uuid, current_setting('test.competitor_two_id')::uuid,
+  'competitor_may_emphasize_repeat_purchase_mechanics', 'Brand two hypothesis', 'Test lineage', 'low',
+  'retention_effect_not_established', 'Impact is not established.', now(),
+  'strategic-hypotheses-v1',
+  '{"method":"deterministic_template","templateId":"competitor_may_emphasize_repeat_purchase_mechanics","sourceSignalRuleVersion":"competitive-signals-v1"}',
+  'sha256:1414141414141414141414141414141414141414141414141414141414141414'
+) returning id::text as brand_two_hypothesis_id \gset
+select set_config('test.brand_two_hypothesis_id', :'brand_two_hypothesis_id', true);
+
+insert into public.strategic_hypotheses (
+  owned_brand_id, competitor_id, hypothesis_type, statement, rationale, confidence,
+  uncertainty_category, uncertainty_statement, generated_at,
+  hypothesis_engine_version, generation_provenance, hypothesis_hash
+) values (
+  current_setting('test.brand_one_id')::uuid, current_setting('test.sibling_competitor_id')::uuid,
+  'competitor_may_emphasize_repeat_purchase_mechanics', 'Sibling hypothesis', 'Test lineage', 'low',
+  'retention_effect_not_established', 'Impact is not established.', now(),
+  'strategic-hypotheses-v1',
+  '{"method":"deterministic_template","templateId":"competitor_may_emphasize_repeat_purchase_mechanics","sourceSignalRuleVersion":"competitive-signals-v1"}',
+  'sha256:1515151515151515151515151515151515151515151515151515151515151515'
+) returning id::text as sibling_hypothesis_id \gset
+select set_config('test.sibling_hypothesis_id', :'sibling_hypothesis_id', true);
+
+select set_config(
+  'test.experiment_payload',
+  jsonb_build_array(jsonb_build_object(
+    'experimentType', 'subscription_availability',
+    'ownedBrandId', current_setting('test.brand_one_id'),
+    'competitorId', current_setting('test.competitor_one_id'),
+    'sourceHypothesisIds', jsonb_build_array(
+      (select id from public.strategic_hypotheses where hypothesis_hash = 'sha256:9999999999999999999999999999999999999999999999999999999999999999')
+    ),
+    'title', 'Test a visible subscribe-and-save option',
+    'objective', 'Test a current hypothesis with one controlled variant.',
+    'hypothesisUnderTest', 'Evaluate the controlled subscription option against the current experience.',
+    'design', jsonb_build_object(
+      'comparison', 'control_vs_treatment',
+      'variablePolicy', 'single_variable',
+      'heldConstant', 'all_non_target_experience_elements'
+    ),
+    'control', jsonb_build_object('kind', 'current_one_time_purchase_only'),
+    'treatment', jsonb_build_object(
+      'kind', 'visible_subscribe_and_save_option',
+      'discountPercent', jsonb_build_object('status', 'requires_user_configuration'),
+      'competitorReferenceAvailable', true
+    ),
+    'primaryMetric', jsonb_build_object('metric', 'subscription_take_rate', 'measurementReadiness', 'requires_first_party_data'),
+    'guardrailMetrics', jsonb_build_array(
+      jsonb_build_object('metric', 'conversion_rate', 'measurementReadiness', 'requires_first_party_data'),
+      jsonb_build_object('metric', 'contribution_margin_per_order', 'measurementReadiness', 'requires_first_party_data')
+    ),
+    'durationPlanning', jsonb_build_object(
+      'status', 'requires_first_party_data',
+      'requiredInputs', jsonb_build_array('baseline_primary_metric', 'eligible_traffic', 'minimum_detectable_effect', 'significance_level', 'statistical_power')
+    ),
+    'implementationNotes', jsonb_build_array('Configure terms before launch.'),
+    'confidence', jsonb_build_object('level', 'low', 'basis', 'support_for_testing_rationale'),
+    'caveat', jsonb_build_object(
+      'category', 'subscription_customer_fit_and_cancellation',
+      'statement', 'Subscription mechanics should be evaluated for customer fit and cancellation behavior.'
+    ),
+    'generatedAt', '2026-09-04T12:00:00.000Z',
+    'experimentEngineVersion', 'recommended-experiments-v1',
+    'generationProvenance', jsonb_build_object(
+      'method', 'deterministic_rule',
+      'eligibilityRuleId', 'subscription-availability-v1',
+      'templateId', 'subscription_availability',
+      'sourceHypothesisEngineVersion', 'strategic-hypotheses-v1'
+    ),
+    'experimentHash', 'sha256:1616161616161616161616161616161616161616161616161616161616161616'
+  ))::text,
+  true
+);
+
+set local role service_role;
+select is(
+  (select inserted from public.persist_recommended_experiments(current_setting('test.experiment_payload')::jsonb)),
+  true,
+  'service role can persist a recommended experiment'
+);
+select is(
+  (select inserted from public.persist_recommended_experiments(
+    jsonb_set(current_setting('test.experiment_payload')::jsonb, '{0,generatedAt}', '"2026-09-05T12:00:00.000Z"')
+  )),
+  false,
+  'replaying an experiment identity ignores its generated timestamp'
+);
+
+set local role postgres;
+select is((select count(*) from public.recommended_experiments where experiment_hash = 'sha256:1616161616161616161616161616161616161616161616161616161616161616'), 1::bigint, 'idempotent replay stores one experiment row');
+select is((select count(*) from public.recommended_experiment_hypotheses where experiment_id = (select id from public.recommended_experiments where experiment_hash = 'sha256:1616161616161616161616161616161616161616161616161616161616161616')), 1::bigint, 'idempotent replay stores one ordered hypothesis set');
+select is((
+  select count(*) from public.recommended_experiments re
+  join public.recommended_experiment_hypotheses reh on reh.experiment_id = re.id
+  join public.strategic_hypothesis_signals shs on shs.hypothesis_id = reh.hypothesis_id
+  join public.competitive_signal_evidence cse on cse.signal_id = shs.signal_id
+  join public.snapshots snapshots on snapshots.id = cse.snapshot_id
+  left join public.observations observations on observations.id = cse.observation_id
+  where re.experiment_hash = 'sha256:1616161616161616161616161616161616161616161616161616161616161616'
+    and (cse.observation_id is null or observations.id is not null)
+), 2::bigint, 'recommended experiment lineage traverses hypotheses, signals, and evidence');
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', true);
+select is((select count(*) from public.recommended_experiments), 1::bigint, 'member can select same-organization recommended experiments');
+select is((select count(*) from public.recommended_experiment_hypotheses), 1::bigint, 'member can select same-organization recommended experiment hypotheses');
+
+select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+select is((select count(*) from public.recommended_experiments), 0::bigint, 'cross-organization recommended experiments are invisible');
+select is((select count(*) from public.recommended_experiment_hypotheses), 0::bigint, 'cross-organization recommended experiment hypotheses are invisible');
+
+select set_config('request.jwt.claim.sub', '44444444-4444-4444-4444-444444444444', true);
+select throws_like($$ insert into public.recommended_experiments (
+  owned_brand_id, competitor_id, experiment_type, title, objective, hypothesis_under_test,
+  design, control_configuration, treatment_configuration, primary_metric, guardrail_metrics,
+  duration_planning, implementation_notes, confidence_level, confidence_basis, caveat_category,
+  caveat_statement, generated_at, experiment_engine_version, generation_provenance, experiment_hash
+) select owned_brand_id, competitor_id, experiment_type, title, objective, hypothesis_under_test,
+  design, control_configuration, treatment_configuration, primary_metric, guardrail_metrics,
+  duration_planning, implementation_notes, confidence_level, confidence_basis, caveat_category,
+  caveat_statement, generated_at, experiment_engine_version, generation_provenance,
+  'sha256:1717171717171717171717171717171717171717171717171717171717171717'
+  from public.recommended_experiments limit 1 $$, '%permission denied%', 'authenticated users cannot insert recommended experiments');
+select throws_like($$ update public.recommended_experiments set title = 'Denied' $$, '%permission denied%', 'authenticated users cannot update recommended experiments');
+select throws_like($$ delete from public.recommended_experiments $$, '%permission denied%', 'authenticated users cannot delete recommended experiments');
+select throws_like($$ insert into public.recommended_experiment_hypotheses (experiment_id, position, hypothesis_id)
+  select id, 1, (select id from public.strategic_hypotheses limit 1) from public.recommended_experiments limit 1 $$, '%permission denied%', 'authenticated users cannot insert recommended experiment hypotheses');
+select throws_like($$ select public.persist_recommended_experiments('[]'::jsonb) $$, '%permission denied%', 'authenticated users cannot call recommended experiment persistence RPC');
+
+set local role postgres;
+select throws_like($$ update public.recommended_experiments set title = 'Changed' $$, '%recommended_experiments are append-only%', 'recommended experiment updates are rejected for postgres');
+select throws_like($$ delete from public.recommended_experiments $$, '%recommended_experiments are append-only%', 'recommended experiment deletes are rejected for postgres');
+select throws_like($$ update public.recommended_experiment_hypotheses set position = 1 $$, '%recommended_experiment_hypotheses are append-only%', 'recommended experiment hypothesis updates are rejected for postgres');
+select throws_like($$ delete from public.recommended_experiment_hypotheses $$, '%recommended_experiment_hypotheses are append-only%', 'recommended experiment hypothesis deletes are rejected for postgres');
+
+set local role service_role;
+select throws_like($$ select public.persist_recommended_experiments(jsonb_build_array(jsonb_set(
+  jsonb_set(current_setting('test.experiment_payload')::jsonb -> 0, '{experimentHash}', '"sha256:1818181818181818181818181818181818181818181818181818181818181818"'),
+  '{sourceHypothesisIds}', jsonb_build_array(current_setting('test.brand_two_hypothesis_id'))
+))) $$, '%supporting hypothesis must belong to the experiment brand%', 'recommended experiments reject cross-tenant hypothesis injection');
+select throws_like($$ select public.persist_recommended_experiments(jsonb_build_array(jsonb_set(
+  jsonb_set(current_setting('test.experiment_payload')::jsonb -> 0, '{experimentHash}', '"sha256:1919191919191919191919191919191919191919191919191919191919191919"'),
+  '{sourceHypothesisIds}', jsonb_build_array(current_setting('test.sibling_hypothesis_id'))
+))) $$, '%supporting hypothesis must belong to the experiment competitor%', 'recommended experiments reject cross-competitor hypothesis injection');
+
+select is((select inserted from public.persist_recommended_experiments(jsonb_build_array(jsonb_set(
+  jsonb_set(current_setting('test.experiment_payload')::jsonb -> 0, '{experimentHash}', '"sha256:2020202020202020202020202020202020202020202020202020202020202020"'),
+  '{sourceHypothesisIds}', jsonb_build_array((select id from public.strategic_hypotheses where hypothesis_hash = 'sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'))
+)))), true, 'changed hypothesis lineage can create a later immutable experiment');
+select is((select inserted from public.persist_recommended_experiments(jsonb_build_array(jsonb_set(
+  jsonb_set(current_setting('test.experiment_payload')::jsonb -> 0, '{experimentHash}', '"sha256:2121212121212121212121212121212121212121212121212121212121212121"'),
+  '{experimentEngineVersion}', '"recommended-experiments-v2"'
+)))), true, 'a new experiment engine version can coexist with prior history');
+
+select throws_like($$ select public.persist_recommended_experiments(jsonb_build_array(
+  jsonb_set(current_setting('test.experiment_payload')::jsonb -> 0, '{experimentHash}', '"sha256:2222222222222222222222222222222222222222222222222222222222222222"'),
+  jsonb_set(jsonb_set(current_setting('test.experiment_payload')::jsonb -> 0, '{experimentHash}', '"sha256:2323232323232323232323232323232323232323232323232323232323232323"'), '{sourceHypothesisIds}', jsonb_build_array(current_setting('test.brand_two_hypothesis_id')))
+)) $$, '%supporting hypothesis must belong to the experiment brand%', 'an invalid recommended experiment batch fails atomically');
+
+set local role postgres;
+select is((select count(*) from public.recommended_experiments where experiment_hash in (
+  'sha256:2222222222222222222222222222222222222222222222222222222222222222',
+  'sha256:2323232323232323232323232323232323232323232323232323232323232323'
+)), 0::bigint, 'an invalid recommended experiment batch rolls back earlier inserts');
 
 select * from finish();
 rollback;

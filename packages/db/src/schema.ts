@@ -87,6 +87,23 @@ export const strategicHypothesisUncertaintyCategoryValues = [
   'combined_business_impact_not_established',
 ] as const;
 
+export const recommendedExperimentTypeValues = [
+  'free_shipping_threshold',
+  'return_window_policy',
+  'guarantee_policy',
+  'subscription_availability',
+  'subscription_discount',
+  'explicit_discount',
+  'bundle_offer',
+  'bogo_offer',
+] as const;
+export const recommendedExperimentCaveatCategoryValues = [
+  'shipping_margin_exposure',
+  'policy_return_refund_exposure',
+  'subscription_customer_fit_and_cancellation',
+  'promotion_margin_exposure',
+] as const;
+
 export const organizations = pgTable('organizations', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: text('name').notNull(),
@@ -578,5 +595,157 @@ export const strategicHypothesisSignals = pgTable(
     ),
     index('strategic_hypothesis_signals_signal_id_idx').on(table.signalId),
     check('strategic_hypothesis_signals_position_nonnegative', sql`${table.position} >= 0`),
+  ],
+);
+
+export const recommendedExperiments = pgTable(
+  'recommended_experiments',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    ownedBrandId: uuid('owned_brand_id')
+      .notNull()
+      .references(() => brands.id, { onDelete: 'restrict' }),
+    competitorId: uuid('competitor_id').notNull(),
+    experimentType: text('experiment_type', { enum: recommendedExperimentTypeValues }).notNull(),
+    title: text('title').notNull(),
+    objective: text('objective').notNull(),
+    hypothesisUnderTest: text('hypothesis_under_test').notNull(),
+    design: jsonb('design').$type<Record<string, unknown>>().notNull(),
+    controlConfiguration: jsonb('control_configuration').$type<Record<string, unknown>>().notNull(),
+    treatmentConfiguration: jsonb('treatment_configuration')
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    primaryMetric: jsonb('primary_metric').$type<Record<string, unknown>>().notNull(),
+    guardrailMetrics: jsonb('guardrail_metrics').$type<Array<Record<string, unknown>>>().notNull(),
+    durationPlanning: jsonb('duration_planning').$type<Record<string, unknown>>().notNull(),
+    implementationNotes: jsonb('implementation_notes').$type<string[]>().notNull(),
+    confidenceLevel: text('confidence_level', {
+      enum: strategicHypothesisConfidenceValues,
+    }).notNull(),
+    confidenceBasis: text('confidence_basis').notNull(),
+    caveatCategory: text('caveat_category', {
+      enum: recommendedExperimentCaveatCategoryValues,
+    }).notNull(),
+    caveatStatement: text('caveat_statement').notNull(),
+    generatedAt: timestamp('generated_at', { withTimezone: true }).notNull(),
+    experimentEngineVersion: text('experiment_engine_version').notNull(),
+    generationProvenance: jsonb('generation_provenance')
+      .$type<{
+        method: 'deterministic_rule';
+        eligibilityRuleId: string;
+        templateId: string;
+        sourceHypothesisEngineVersion: string;
+      }>()
+      .notNull(),
+    experimentHash: text('experiment_hash').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('recommended_experiments_owned_brand_id_generated_at_idx').on(
+      table.ownedBrandId,
+      table.generatedAt.desc(),
+    ),
+    index('recommended_experiments_competitor_id_generated_at_idx').on(
+      table.competitorId,
+      table.generatedAt.desc(),
+    ),
+    unique('recommended_experiments_owned_brand_id_experiment_hash_key').on(
+      table.ownedBrandId,
+      table.experimentHash,
+    ),
+    foreignKey({
+      columns: [table.competitorId, table.ownedBrandId],
+      foreignColumns: [competitors.id, competitors.brandId],
+      name: 'recommended_experiments_competitor_matches_brand_fk',
+    }),
+    check(
+      'recommended_experiments_experiment_type_allowed',
+      sql`${table.experimentType} in ('free_shipping_threshold', 'return_window_policy', 'guarantee_policy', 'subscription_availability', 'subscription_discount', 'explicit_discount', 'bundle_offer', 'bogo_offer')`,
+    ),
+    check('recommended_experiments_title_not_blank', sql`char_length(trim(${table.title})) > 0`),
+    check(
+      'recommended_experiments_objective_not_blank',
+      sql`char_length(trim(${table.objective})) > 0`,
+    ),
+    check(
+      'recommended_experiments_hypothesis_under_test_not_blank',
+      sql`char_length(trim(${table.hypothesisUnderTest})) > 0`,
+    ),
+    check('recommended_experiments_design_object', sql`jsonb_typeof(${table.design}) = 'object'`),
+    check(
+      'recommended_experiments_control_object',
+      sql`jsonb_typeof(${table.controlConfiguration}) = 'object'`,
+    ),
+    check(
+      'recommended_experiments_treatment_object',
+      sql`jsonb_typeof(${table.treatmentConfiguration}) = 'object'`,
+    ),
+    check(
+      'recommended_experiments_primary_metric_object',
+      sql`jsonb_typeof(${table.primaryMetric}) = 'object'`,
+    ),
+    check(
+      'recommended_experiments_guardrail_metrics_array',
+      sql`jsonb_typeof(${table.guardrailMetrics}) = 'array' and jsonb_array_length(${table.guardrailMetrics}) > 0`,
+    ),
+    check(
+      'recommended_experiments_duration_planning_object',
+      sql`jsonb_typeof(${table.durationPlanning}) = 'object'`,
+    ),
+    check(
+      'recommended_experiments_implementation_notes_array',
+      sql`jsonb_typeof(${table.implementationNotes}) = 'array' and jsonb_array_length(${table.implementationNotes}) > 0`,
+    ),
+    check(
+      'recommended_experiments_confidence_level_allowed',
+      sql`${table.confidenceLevel} in ('medium', 'low')`,
+    ),
+    check(
+      'recommended_experiments_confidence_basis_allowed',
+      sql`${table.confidenceBasis} = 'support_for_testing_rationale'`,
+    ),
+    check(
+      'recommended_experiments_caveat_category_allowed',
+      sql`${table.caveatCategory} in ('shipping_margin_exposure', 'policy_return_refund_exposure', 'subscription_customer_fit_and_cancellation', 'promotion_margin_exposure')`,
+    ),
+    check(
+      'recommended_experiments_caveat_statement_not_blank',
+      sql`char_length(trim(${table.caveatStatement})) > 0`,
+    ),
+    check(
+      'recommended_experiments_engine_version_not_blank',
+      sql`char_length(trim(${table.experimentEngineVersion})) > 0`,
+    ),
+    check(
+      'recommended_experiments_provenance_object',
+      sql`jsonb_typeof(${table.generationProvenance}) = 'object'`,
+    ),
+    check(
+      'recommended_experiments_hash_sha256',
+      sql`${table.experimentHash} ~ '^sha256:[0-9a-f]{64}$'`,
+    ),
+  ],
+);
+
+export const recommendedExperimentHypotheses = pgTable(
+  'recommended_experiment_hypotheses',
+  {
+    experimentId: uuid('experiment_id')
+      .notNull()
+      .references(() => recommendedExperiments.id, { onDelete: 'restrict' }),
+    position: smallint('position').notNull(),
+    hypothesisId: uuid('hypothesis_id')
+      .notNull()
+      .references(() => strategicHypotheses.id, { onDelete: 'restrict' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.experimentId, table.position] }),
+    unique('recommended_experiment_hypotheses_experiment_id_hypothesis_id_key').on(
+      table.experimentId,
+      table.hypothesisId,
+    ),
+    index('recommended_experiment_hypotheses_hypothesis_id_idx').on(table.hypothesisId),
+    check('recommended_experiment_hypotheses_position_nonnegative', sql`${table.position} >= 0`),
   ],
 );

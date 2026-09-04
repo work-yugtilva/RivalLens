@@ -19,3 +19,10 @@ export {
   type GenerateStrategicHypothesesInput,
   type ResolveCurrentStrategicHypothesesInput,
 } from './hypotheses';
+
+export {
+  RECOMMENDED_EXPERIMENT_ENGINE_VERSION,
+  SUPPORTED_EXPERIMENT_HYPOTHESIS_ENGINE_VERSION,
+  generateRecommendedExperiments,
+  type GenerateRecommendedExperimentsInput,
+} from './experiments';
