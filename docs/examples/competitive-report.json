@@ -1,0 +1,523 @@
+{
+  "brandId": "11111111-1111-4111-8111-111111111111",
+  "generatedAt": "2026-09-04T12:00:00.000Z",
+  "reportEngineVersion": "competitive-report-v1",
+  "reportHash": "sha256:d0a21fe2577e835d37774990f227d5d9abdd9bfd5b643c1b0991317f51e0b4f0",
+  "sourceStateHash": "sha256:6cb296973d23e8e83f4b3e2d39d0490c5d6b41d458a5d1923555a99fc9e06515",
+  "competitors": [
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "name": "rival.test"
+    }
+  ],
+  "sourceIntelligence": {
+    "signalIds": [
+      "00000000-0000-4000-8000-000000000001",
+      "00000000-0000-4000-8000-000000000002",
+      "00000000-0000-4000-8000-000000000003"
+    ],
+    "hypothesisIds": [
+      "00000000-0000-4000-8000-000000000100",
+      "00000000-0000-4000-8000-000000000101"
+    ],
+    "experimentIds": [
+      "00000000-0000-4000-8000-000000000200",
+      "00000000-0000-4000-8000-000000000201"
+    ]
+  },
+  "completeness": {
+    "state": "complete",
+    "comparisonUnknown": [],
+    "signals": {
+      "unresolved": [],
+      "generationNeeded": []
+    },
+    "hypotheses": {
+      "unresolved": [],
+      "generationNeeded": []
+    },
+    "experiments": {
+      "unresolved": [],
+      "generationNeeded": []
+    },
+    "sections": {
+      "yourAdvantages": {
+        "state": "supported",
+        "available": 1,
+        "omitted": 0
+      },
+      "competitorAdvantages": {
+        "state": "supported",
+        "available": 2,
+        "omitted": 0
+      },
+      "appearsToBeWorking": {
+        "state": "supported",
+        "available": 2,
+        "omitted": 0
+      },
+      "whatToTestNext": {
+        "state": "supported",
+        "available": 2,
+        "omitted": 0
+      }
+    }
+  },
+  "sections": {
+    "yourAdvantages": [
+      {
+        "title": "Return window",
+        "statement": "rival.test offers a 30-day return window versus your 60-day return window.",
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "competitorName": "rival.test",
+        "confidence": "high",
+        "provenance": {
+          "signals": [
+            {
+              "signalId": "00000000-0000-4000-8000-000000000002",
+              "comparisonKey": "policy.return_window",
+              "evidence": [
+                {
+                  "role": "owned",
+                  "sourceId": "00000000-0000-4000-8000-000000000900",
+                  "snapshotId": "00000000-0000-4000-8000-000000000910",
+                  "observationId": "00000000-0000-4000-8000-000000001002",
+                  "confidence": 0.95
+                },
+                {
+                  "role": "competitor",
+                  "sourceId": "00000000-0000-4000-8000-000000000901",
+                  "snapshotId": "00000000-0000-4000-8000-000000000911",
+                  "observationId": "00000000-0000-4000-8000-000000001003",
+                  "confidence": 0.95
+                }
+              ]
+            }
+          ],
+          "hypotheses": [],
+          "experiments": []
+        },
+        "itemType": "competitive_fact",
+        "signalType": "competitor_shorter_return_window",
+        "supportingValues": {
+          "owned": 60,
+          "competitor": 30,
+          "delta": -30,
+          "unit": "days"
+        }
+      }
+    ],
+    "competitorAdvantages": [
+      {
+        "title": "Free-shipping threshold",
+        "statement": "rival.test offers a $50 free-shipping threshold versus your $75 free-shipping threshold.",
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "competitorName": "rival.test",
+        "confidence": "high",
+        "provenance": {
+          "signals": [
+            {
+              "signalId": "00000000-0000-4000-8000-000000000001",
+              "comparisonKey": "offer.free_shipping_threshold",
+              "evidence": [
+                {
+                  "role": "owned",
+                  "sourceId": "00000000-0000-4000-8000-000000000900",
+                  "snapshotId": "00000000-0000-4000-8000-000000000910",
+                  "observationId": "00000000-0000-4000-8000-000000001000",
+                  "confidence": 0.95
+                },
+                {
+                  "role": "competitor",
+                  "sourceId": "00000000-0000-4000-8000-000000000901",
+                  "snapshotId": "00000000-0000-4000-8000-000000000911",
+                  "observationId": "00000000-0000-4000-8000-000000001001",
+                  "confidence": 0.95
+                }
+              ]
+            }
+          ],
+          "hypotheses": [],
+          "experiments": []
+        },
+        "itemType": "competitive_fact",
+        "signalType": "competitor_lower_free_shipping_threshold",
+        "supportingValues": {
+          "owned": 75,
+          "competitor": 50,
+          "delta": -25,
+          "unit": "usd"
+        }
+      },
+      {
+        "title": "Subscription availability",
+        "statement": "rival.test offers a subscription option while your brand explicitly does not.",
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "competitorName": "rival.test",
+        "confidence": "high",
+        "provenance": {
+          "signals": [
+            {
+              "signalId": "00000000-0000-4000-8000-000000000003",
+              "comparisonKey": "subscription.available",
+              "evidence": [
+                {
+                  "role": "competitor",
+                  "sourceId": "00000000-0000-4000-8000-000000000901",
+                  "snapshotId": "00000000-0000-4000-8000-000000000911",
+                  "observationId": "00000000-0000-4000-8000-000000001005",
+                  "confidence": 0.95
+                },
+                {
+                  "role": "owned",
+                  "sourceId": "00000000-0000-4000-8000-000000000900",
+                  "snapshotId": "00000000-0000-4000-8000-000000000910",
+                  "observationId": null,
+                  "confidence": 0.95
+                }
+              ]
+            }
+          ],
+          "hypotheses": [],
+          "experiments": []
+        },
+        "itemType": "competitive_fact",
+        "signalType": "competitor_offers_subscription_owned_does_not",
+        "supportingValues": {
+          "owned": false,
+          "competitor": true
+        }
+      }
+    ],
+    "appearsToBeWorking": [
+      {
+        "title": "Possible shipping-friction strategy",
+        "statement": "The competitor may be using a lower free-shipping threshold to reduce purchase friction.",
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "competitorName": "rival.test",
+        "confidence": "medium",
+        "provenance": {
+          "signals": [
+            {
+              "signalId": "00000000-0000-4000-8000-000000000001",
+              "comparisonKey": "offer.free_shipping_threshold",
+              "evidence": [
+                {
+                  "role": "owned",
+                  "sourceId": "00000000-0000-4000-8000-000000000900",
+                  "snapshotId": "00000000-0000-4000-8000-000000000910",
+                  "observationId": "00000000-0000-4000-8000-000000001000",
+                  "confidence": 0.95
+                },
+                {
+                  "role": "competitor",
+                  "sourceId": "00000000-0000-4000-8000-000000000901",
+                  "snapshotId": "00000000-0000-4000-8000-000000000911",
+                  "observationId": "00000000-0000-4000-8000-000000001001",
+                  "confidence": 0.95
+                }
+              ]
+            }
+          ],
+          "hypotheses": [
+            {
+              "hypothesisId": "00000000-0000-4000-8000-000000000101",
+              "supportingSignalIds": ["00000000-0000-4000-8000-000000000001"]
+            }
+          ],
+          "experiments": []
+        },
+        "itemType": "strategic_hypothesis",
+        "hypothesisType": "competitor_may_reduce_shipping_friction",
+        "uncertainty": {
+          "category": "conversion_effect_not_established",
+          "statement": "Public evidence does not establish whether this improves conversion."
+        }
+      },
+      {
+        "title": "Repeat-purchase emphasis",
+        "statement": "The competitor may be emphasizing repeat-purchase mechanics.",
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "competitorName": "rival.test",
+        "confidence": "medium",
+        "provenance": {
+          "signals": [
+            {
+              "signalId": "00000000-0000-4000-8000-000000000003",
+              "comparisonKey": "subscription.available",
+              "evidence": [
+                {
+                  "role": "competitor",
+                  "sourceId": "00000000-0000-4000-8000-000000000901",
+                  "snapshotId": "00000000-0000-4000-8000-000000000911",
+                  "observationId": "00000000-0000-4000-8000-000000001005",
+                  "confidence": 0.95
+                },
+                {
+                  "role": "owned",
+                  "sourceId": "00000000-0000-4000-8000-000000000900",
+                  "snapshotId": "00000000-0000-4000-8000-000000000910",
+                  "observationId": null,
+                  "confidence": 0.95
+                }
+              ]
+            }
+          ],
+          "hypotheses": [
+            {
+              "hypothesisId": "00000000-0000-4000-8000-000000000100",
+              "supportingSignalIds": ["00000000-0000-4000-8000-000000000003"]
+            }
+          ],
+          "experiments": []
+        },
+        "itemType": "strategic_hypothesis",
+        "hypothesisType": "competitor_may_emphasize_repeat_purchase_mechanics",
+        "uncertainty": {
+          "category": "retention_effect_not_established",
+          "statement": "Public evidence does not establish whether this improves retention or lifetime value."
+        }
+      }
+    ],
+    "whatToTestNext": [
+      {
+        "title": "Test a lower free-shipping threshold",
+        "statement": "Test the current shipping-friction hypothesis with one controlled threshold variant.",
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "competitorName": "rival.test",
+        "confidence": "medium",
+        "provenance": {
+          "signals": [
+            {
+              "signalId": "00000000-0000-4000-8000-000000000001",
+              "comparisonKey": "offer.free_shipping_threshold",
+              "evidence": [
+                {
+                  "role": "owned",
+                  "sourceId": "00000000-0000-4000-8000-000000000900",
+                  "snapshotId": "00000000-0000-4000-8000-000000000910",
+                  "observationId": "00000000-0000-4000-8000-000000001000",
+                  "confidence": 0.95
+                },
+                {
+                  "role": "competitor",
+                  "sourceId": "00000000-0000-4000-8000-000000000901",
+                  "snapshotId": "00000000-0000-4000-8000-000000000911",
+                  "observationId": "00000000-0000-4000-8000-000000001001",
+                  "confidence": 0.95
+                }
+              ]
+            }
+          ],
+          "hypotheses": [
+            {
+              "hypothesisId": "00000000-0000-4000-8000-000000000101",
+              "supportingSignalIds": ["00000000-0000-4000-8000-000000000001"]
+            }
+          ],
+          "experiments": [
+            {
+              "experimentId": "00000000-0000-4000-8000-000000000200",
+              "sourceHypothesisIds": ["00000000-0000-4000-8000-000000000101"]
+            }
+          ]
+        },
+        "itemType": "recommended_experiment",
+        "experiment": {
+          "ownedBrandId": "11111111-1111-4111-8111-111111111111",
+          "competitorId": "22222222-2222-4222-8222-222222222222",
+          "sourceHypothesisIds": ["00000000-0000-4000-8000-000000000101"],
+          "title": "Test a lower free-shipping threshold",
+          "objective": "Test the current shipping-friction hypothesis with one controlled threshold variant.",
+          "hypothesisUnderTest": "Evaluate whether a safely selected lower free-shipping threshold performs differently from the current threshold on checkout conversion while respecting margin and shipping-cost guardrails.",
+          "design": {
+            "comparison": "control_vs_treatment",
+            "variablePolicy": "single_variable",
+            "heldConstant": "all_non_target_experience_elements"
+          },
+          "primaryMetric": {
+            "metric": "checkout_conversion_rate",
+            "measurementReadiness": "requires_first_party_data"
+          },
+          "guardrailMetrics": [
+            {
+              "metric": "contribution_margin_per_order",
+              "measurementReadiness": "requires_first_party_data"
+            },
+            {
+              "metric": "shipping_cost_per_order",
+              "measurementReadiness": "requires_first_party_data"
+            },
+            {
+              "metric": "average_order_value",
+              "measurementReadiness": "requires_first_party_data"
+            }
+          ],
+          "durationPlanning": {
+            "status": "requires_first_party_data",
+            "requiredInputs": [
+              "baseline_primary_metric",
+              "eligible_traffic",
+              "minimum_detectable_effect",
+              "significance_level",
+              "statistical_power"
+            ]
+          },
+          "implementationNotes": [
+            "Select the treatment threshold after reviewing unit economics; use the competitor threshold only as a reference point.",
+            "Keep other shipping and checkout variables unchanged during the controlled comparison."
+          ],
+          "confidence": {
+            "level": "medium",
+            "basis": "support_for_testing_rationale"
+          },
+          "caveat": {
+            "category": "shipping_margin_exposure",
+            "statement": "Lower thresholds may increase shipping subsidy and should be evaluated against margin guardrails."
+          },
+          "generatedAt": "2026-09-04T12:00:00.000Z",
+          "experimentEngineVersion": "recommended-experiments-v1",
+          "generationProvenance": {
+            "method": "deterministic_rule",
+            "eligibilityRuleId": "shipping-lower-threshold-v1",
+            "templateId": "free_shipping_threshold",
+            "sourceHypothesisEngineVersion": "strategic-hypotheses-v1"
+          },
+          "experimentHash": "sha256:e1de1e18173c982ad5cc5f2202d79077a750d8d6daa0818162c21db39e3f4b09",
+          "experimentType": "free_shipping_threshold",
+          "control": {
+            "kind": "current_free_shipping_threshold",
+            "thresholdUsd": 75
+          },
+          "treatment": {
+            "kind": "configurable_lower_free_shipping_threshold",
+            "thresholdUsd": {
+              "status": "requires_user_configuration"
+            },
+            "constraint": "lower_than_control",
+            "competitorReferenceThresholdUsd": 50
+          },
+          "id": "00000000-0000-4000-8000-000000000200"
+        }
+      },
+      {
+        "title": "Test a visible subscribe-and-save option",
+        "statement": "Test the current repeat-purchase hypothesis with one controlled subscription-availability variant.",
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "competitorName": "rival.test",
+        "confidence": "medium",
+        "provenance": {
+          "signals": [
+            {
+              "signalId": "00000000-0000-4000-8000-000000000003",
+              "comparisonKey": "subscription.available",
+              "evidence": [
+                {
+                  "role": "competitor",
+                  "sourceId": "00000000-0000-4000-8000-000000000901",
+                  "snapshotId": "00000000-0000-4000-8000-000000000911",
+                  "observationId": "00000000-0000-4000-8000-000000001005",
+                  "confidence": 0.95
+                },
+                {
+                  "role": "owned",
+                  "sourceId": "00000000-0000-4000-8000-000000000900",
+                  "snapshotId": "00000000-0000-4000-8000-000000000910",
+                  "observationId": null,
+                  "confidence": 0.95
+                }
+              ]
+            }
+          ],
+          "hypotheses": [
+            {
+              "hypothesisId": "00000000-0000-4000-8000-000000000100",
+              "supportingSignalIds": ["00000000-0000-4000-8000-000000000003"]
+            }
+          ],
+          "experiments": [
+            {
+              "experimentId": "00000000-0000-4000-8000-000000000201",
+              "sourceHypothesisIds": ["00000000-0000-4000-8000-000000000100"]
+            }
+          ]
+        },
+        "itemType": "recommended_experiment",
+        "experiment": {
+          "ownedBrandId": "11111111-1111-4111-8111-111111111111",
+          "competitorId": "22222222-2222-4222-8222-222222222222",
+          "sourceHypothesisIds": ["00000000-0000-4000-8000-000000000100"],
+          "title": "Test a visible subscribe-and-save option",
+          "objective": "Test the current repeat-purchase hypothesis with one controlled subscription-availability variant.",
+          "hypothesisUnderTest": "Evaluate how a visible subscribe-and-save option compares with the current one-time-purchase-only experience on eligible product pages.",
+          "design": {
+            "comparison": "control_vs_treatment",
+            "variablePolicy": "single_variable",
+            "heldConstant": "all_non_target_experience_elements"
+          },
+          "primaryMetric": {
+            "metric": "subscription_take_rate",
+            "measurementReadiness": "requires_first_party_data"
+          },
+          "guardrailMetrics": [
+            {
+              "metric": "conversion_rate",
+              "measurementReadiness": "requires_first_party_data"
+            },
+            {
+              "metric": "contribution_margin_per_order",
+              "measurementReadiness": "requires_first_party_data"
+            },
+            {
+              "metric": "subscription_cancellation_rate",
+              "measurementReadiness": "requires_first_party_data"
+            }
+          ],
+          "durationPlanning": {
+            "status": "requires_first_party_data",
+            "requiredInputs": [
+              "baseline_primary_metric",
+              "eligible_traffic",
+              "minimum_detectable_effect",
+              "significance_level",
+              "statistical_power"
+            ]
+          },
+          "implementationNotes": [
+            "Limit the treatment to eligible product pages and configure subscription terms before launch.",
+            "Keep non-subscription pricing and merchandising unchanged during the controlled comparison."
+          ],
+          "confidence": {
+            "level": "medium",
+            "basis": "support_for_testing_rationale"
+          },
+          "caveat": {
+            "category": "subscription_customer_fit_and_cancellation",
+            "statement": "Subscription mechanics should be evaluated for customer fit and cancellation behavior."
+          },
+          "generatedAt": "2026-09-04T12:00:00.000Z",
+          "experimentEngineVersion": "recommended-experiments-v1",
+          "generationProvenance": {
+            "method": "deterministic_rule",
+            "eligibilityRuleId": "subscription-availability-v1",
+            "templateId": "subscription_availability",
+            "sourceHypothesisEngineVersion": "strategic-hypotheses-v1"
+          },
+          "experimentHash": "sha256:a11c1cd0cd838f36df0516f8ddfc170a22aacd568a66a6e4346f4f827847e408",
+          "experimentType": "subscription_availability",
+          "control": {
+            "kind": "current_one_time_purchase_only"
+          },
+          "treatment": {
+            "kind": "visible_subscribe_and_save_option",
+            "discountPercent": {
+              "status": "requires_user_configuration"
+            },
+            "competitorReferenceAvailable": true
+          },
+          "id": "00000000-0000-4000-8000-000000000201"
+        }
+      }
+    ]
+  }
+}

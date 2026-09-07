@@ -31,3 +31,10 @@ export {
   resolveCurrentRecommendedExperiments,
   type ResolveCurrentRecommendedExperimentsInput,
 } from './current-experiments';
+
+export {
+  COMPETITIVE_REPORT_ENGINE_VERSION,
+  COMPETITIVE_REPORT_SECTION_LIMIT,
+  competitiveReportHash,
+  composeCompetitiveIntelligenceReport,
+} from './reports';

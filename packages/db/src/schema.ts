@@ -749,3 +749,76 @@ export const recommendedExperimentHypotheses = pgTable(
     check('recommended_experiment_hypotheses_position_nonnegative', sql`${table.position} >= 0`),
   ],
 );
+
+export const competitiveIntelligenceReports = pgTable(
+  'competitive_intelligence_reports',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    ownedBrandId: uuid('owned_brand_id')
+      .notNull()
+      .references(() => brands.id, { onDelete: 'restrict' }),
+    competitorIds: uuid('competitor_ids').array().notNull(),
+    reportEngineVersion: text('report_engine_version').notNull(),
+    reportHash: text('report_hash').notNull(),
+    generatedAt: timestamp('generated_at', { withTimezone: true }).notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('competitive_intelligence_reports_latest_scope_idx').on(
+      table.ownedBrandId,
+      table.competitorIds,
+      table.generatedAt.desc(),
+      table.id.desc(),
+    ),
+    unique('competitive_intelligence_reports_owned_brand_id_report_hash_key').on(
+      table.ownedBrandId,
+      table.reportHash,
+    ),
+    check(
+      'competitive_intelligence_reports_competitor_count',
+      sql`cardinality(${table.competitorIds}) between 1 and 5`,
+    ),
+    check(
+      'competitive_intelligence_reports_engine_version',
+      sql`char_length(trim(${table.reportEngineVersion})) > 0`,
+    ),
+    check(
+      'competitive_intelligence_reports_report_hash_sha256',
+      sql`${table.reportHash} ~ '^sha256:[0-9a-f]{64}$'`,
+    ),
+    check(
+      'competitive_intelligence_reports_payload_valid',
+      sql`jsonb_typeof(${table.payload}) = 'object'
+        and ${table.payload} ?& array[
+          'brandId', 'generatedAt', 'reportEngineVersion', 'reportHash', 'sourceStateHash',
+          'competitors', 'sourceIntelligence', 'completeness', 'sections'
+        ]
+        and ${table.payload} - 'brandId' - 'generatedAt' - 'reportEngineVersion' - 'reportHash'
+          - 'sourceStateHash' - 'competitors' - 'sourceIntelligence' - 'completeness' - 'sections'
+          = '{}'::jsonb
+        and (${table.payload} ->> 'brandId')::uuid = ${table.ownedBrandId}
+        and (${table.payload} ->> 'generatedAt')::timestamptz = ${table.generatedAt}
+        and ${table.payload} ->> 'reportEngineVersion' = ${table.reportEngineVersion}
+        and ${table.payload} ->> 'reportHash' = ${table.reportHash}
+        and ${table.payload} ->> 'sourceStateHash' ~ '^sha256:[0-9a-f]{64}$'
+        and jsonb_typeof(${table.payload} -> 'competitors') = 'array'
+        and jsonb_typeof(${table.payload} -> 'sourceIntelligence') = 'object'
+        and jsonb_typeof(${table.payload} -> 'completeness') = 'object'
+        and jsonb_typeof(${table.payload} -> 'sections') = 'object'
+        and (${table.payload} -> 'sections') ?& array[
+          'yourAdvantages', 'competitorAdvantages', 'appearsToBeWorking', 'whatToTestNext'
+        ]
+        and (${table.payload} -> 'sections') - 'yourAdvantages' - 'competitorAdvantages'
+          - 'appearsToBeWorking' - 'whatToTestNext' = '{}'::jsonb
+        and jsonb_typeof(${table.payload} #> '{sections,yourAdvantages}') = 'array'
+        and jsonb_array_length(${table.payload} #> '{sections,yourAdvantages}') <= 3
+        and jsonb_typeof(${table.payload} #> '{sections,competitorAdvantages}') = 'array'
+        and jsonb_array_length(${table.payload} #> '{sections,competitorAdvantages}') <= 3
+        and jsonb_typeof(${table.payload} #> '{sections,appearsToBeWorking}') = 'array'
+        and jsonb_array_length(${table.payload} #> '{sections,appearsToBeWorking}') <= 3
+        and jsonb_typeof(${table.payload} #> '{sections,whatToTestNext}') = 'array'
+        and jsonb_array_length(${table.payload} #> '{sections,whatToTestNext}') <= 3`,
+    ),
+  ],
+);
