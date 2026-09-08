@@ -1,0 +1,23 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "Final design" },
+    { "id": "page-2", "name": "Explorations" }
+  ],
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 1300, "page": "page-1", "title": "Overview — complete report", "is_interactive": true },
+    { "file": "EvidenceDrawer.dc.html", "x": 1560, "y": 0, "w": 1440, "h": 1300, "page": "page-1", "title": "Overview — evidence drawer open" },
+    { "file": "PartialReport.dc.html", "x": 0, "y": 1500, "w": 1440, "h": 1520, "page": "page-1", "title": "Overview — partial report" },
+    { "file": "StatesSheet.dc.html", "x": 1560, "y": 1500, "w": 1180, "h": 1520, "page": "page-1", "title": "Overview states" },
+    { "file": "Tablet.dc.html", "x": 0, "y": 3140, "w": 834, "h": 1300, "page": "page-1", "title": "Tablet 834" },
+    { "file": "Mobile.dc.html", "x": 954, "y": 3140, "w": 390, "h": 1620, "page": "page-1", "title": "Mobile 390" },
+    { "file": "DirectionB.dc.html", "x": 0, "y": 0, "w": 1440, "h": 980, "page": "page-2", "title": "B · Two-Ledger" },
+    { "file": "DirectionC.dc.html", "x": 1560, "y": 0, "w": 1440, "h": 980, "page": "page-2", "title": "C · Evidence Spine" }
+  ],
+  "annotations": [
+    { "id": "final-note", "x": 0, "y": -160, "w": 640, "page": "page-1", "text": "Direction A, polished for implementation.\n\nClick any item on the Overview to open the evidence drawer. Fact, interpretation and recommended test are told apart by the gutter mark, the typeface and the item's own structure — dashed marks now mean unresolved and nothing else." },
+    { "id": "states-note", "x": 0, "y": 1350, "w": 500, "page": "page-1", "text": "Partial and the remaining report states. Missing intelligence reads as informative, never as broken, and an unknown value never renders as a matching pair." },
+    { "id": "responsive-note", "x": 0, "y": 2990, "w": 500, "page": "page-1", "text": "Tablet and mobile carry the same type ramp and value grid; the drawer becomes a right sheet on tablet." },
+    { "id": "explorations-note", "x": 0, "y": -160, "w": 640, "page": "page-2", "text": "The two directions not taken, kept for reference. B split the report by epistemic class spatially; C kept provenance permanently visible in a signal spine. Neither is maintained." }
+  ],
+  "launch": { "view": "canvas", "page": "page-1" }
+}

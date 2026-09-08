@@ -1,0 +1,3 @@
+Copy source of truth: docs/examples/competitive-report.json
+Owned brand rendered as "yourbrand.test" (test-domain convention matching rival.test).
+No invented metrics. No UUIDs on screen.

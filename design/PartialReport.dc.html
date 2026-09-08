@@ -1,0 +1,294 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,300;6..72,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #4338CA; text-decoration: none; }
+    a:hover { color: #312E81; }
+    .rl * { box-sizing: border-box; }
+    .rl { -webkit-font-smoothing: antialiased; }
+    .nav-item:hover { background: #EFF0F3; color: #16181D; }
+    .item { cursor: pointer; }
+    .item:hover { background: #FAFAFB; }
+    .item:hover .ev { color: #4338CA; }
+    .item:hover .ev span { text-decoration: underline; text-underline-offset: 2px; }
+    .item:focus-visible { outline: none; box-shadow: inset 0 0 0 2px #4338CA; }
+    .ghost:hover { background: #F1F2F5; }
+  </style>
+</helmet>
+
+<div class="rl" style="width: 1440px; height: 1520px; display: flex; overflow: hidden; background: #FCFCFD; color: #16181D; font-family: 'Instrument Sans', system-ui, -apple-system, sans-serif; font-size: 14px; line-height: 1.5;">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside style="width: 240px; flex: none; background: #F7F8FA; border-right: 1px solid #E9EAEE; display: flex; flex-direction: column;">
+    <div style="padding: 20px 16px 16px 20px; border-bottom: 1px solid #E9EAEE;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#4338CA" stroke-width="1.4"><circle cx="7" cy="7" r="4.6"/><path d="M10.4 10.4L14 14"/></svg>
+        <span style="font-size: 14px; font-weight: 600; letter-spacing: -0.02em;">RivalLens</span>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding: 7px 9px; border: 1px solid #E4E6EB; border-radius: 6px; background: #FFFFFF;">
+        <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #23262E;">yourbrand.test</span>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#767C8A" stroke-width="1.3"><path d="M2.5 4L5 6.5L7.5 4"/></svg>
+      </div>
+    </div>
+
+    <nav style="padding: 12px; display: flex; flex-direction: column; gap: 1px;">
+      <div style="position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; background: #F1F1FB; color: #16181D; font-weight: 500; font-size: 13px;">
+        <span style="position: absolute; left: -12px; top: 8px; bottom: 8px; width: 2px; background: #4338CA; border-radius: 0 2px 2px 0;"></span>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#4338CA" stroke-width="1.4"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5.2 6.2h5.6M5.2 9h3.4"/></svg>
+        Overview
+      </div>
+      <div class="nav-item" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; color: #454B59; font-size: 13px;">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2.2" y="4.2" width="7" height="7" rx="1.6"/><path d="M6.8 4.2V3.4a1.2 1.2 0 011.2-1.2h4.4a1.2 1.2 0 011.2 1.2v6.2a1.2 1.2 0 01-1.2 1.2h-.6"/></svg>
+        Rivals
+      </div>
+      <div class="nav-item" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; color: #454B59; font-size: 13px;">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.6 5.6h10.8M11 3.2l2.4 2.4L11 8M13.4 10.4H2.6M5 8l-2.4 2.4L5 12.8"/></svg>
+        Compare
+      </div>
+      <div class="nav-item" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; color: #454B59; font-size: 13px;">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6.4 2.2v4L3 11.4a1.6 1.6 0 001.35 2.4h7.3A1.6 1.6 0 0013 11.4L9.6 6.2v-4M5.4 2.2h5.2M4.7 9.4h6.6"/></svg>
+        Opportunities
+      </div>
+      <div class="nav-item" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; color: #454B59; font-size: 13px;">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2.4" y="2.4" width="11.2" height="4" rx="1.2"/><rect x="2.4" y="9.6" width="11.2" height="4" rx="1.2"/></svg>
+        Evidence
+      </div>
+      <div class="nav-item" style="display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; color: #454B59; font-size: 13px;">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.4 4.6h11.2M2.4 11.4h11.2"/><circle cx="6" cy="4.6" r="1.7"/><circle cx="10.4" cy="11.4" r="1.7"/></svg>
+        Settings
+      </div>
+    </nav>
+
+    <div style="margin-top: auto; padding: 16px 20px; border-top: 1px solid #E9EAEE;">
+      <div style="font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: #767C8A;">Sources refreshed</div>
+      <div style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #5C6270; margin-top: 4px;">4 Sept 2026, 09:16</div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div style="flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column;">
+
+    <header style="height: 80px; flex: none; border-bottom: 1px solid #E9EAEE; background: #FFFFFF; display: flex; align-items: center; justify-content: space-between; padding: 0 32px 0 64px;">
+      <div>
+        <div style="font-size: 15px; font-weight: 600; letter-spacing: -0.012em;">Latest competitive intelligence report</div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; color: #5C6270;">
+          <span style="display: inline-flex; align-items: center; gap: 5px; color: #23262E;">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#A98A4B" stroke-width="1.5"><circle cx="6" cy="6" r="4.4"/><path d="M6 3.4V6.4"/></svg>
+            Partial
+          </span>
+          <span style="color: #C7CAD2;">·</span>
+          <span>1 competitor</span>
+          <span style="color: #C7CAD2;">·</span>
+          <span>generated 2 hours ago</span>
+          <span style="color: #C7CAD2;">·</span>
+          <span style="color: #7A6236;">3 gaps</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div class="ghost" style="display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 11px; border: 1px solid #E4E6EB; border-radius: 6px; background: #FFFFFF; font-size: 13px; color: #23262E;">
+          <span style="width: 6px; height: 6px; border-radius: 50%; background: #5B6070;"></span>
+          rival.test
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#767C8A" stroke-width="1.3"><path d="M2.5 4L5 6.5L7.5 4"/></svg>
+        </div>
+        <div class="ghost" style="display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 11px; border-radius: 6px; font-size: 13px; color: #454B59;">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12.2 7a5.2 5.2 0 11-1.6-3.75M12.4 1.6v3.2H9.2"/></svg>
+          Regenerate
+        </div>
+      </div>
+    </header>
+
+    <!-- ============ REPORT COLUMN ============ -->
+    <div style="flex: 1; overflow: hidden; padding: 30px 0 0 64px;">
+      <div style="width: 896px;">
+
+        <div style="width: 896px; display: flex; align-items: flex-start; gap: 11px; padding: 14px 16px; margin-bottom: 28px; border: 1px solid #EBE3D3; border-left: 2px solid #C8A96A; border-radius: 6px; background: #FDFBF6;">
+          <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="#8A6E3B" stroke-width="1.4" style="margin-top: 2px; flex: none;"><circle cx="7" cy="7" r="5.2"/><path d="M7 4.2v3.4M7 9.6v.1"/></svg>
+          <div style="flex: 1;">
+            <div style="font-size: 14px; font-weight: 600; color: #3F3524;">This report is partial. What it does show is still verified.</div>
+            <p style="margin: 5px 0 0; font-size: 13px; line-height: 1.5; color: #6B5B3C;">Two comparisons could not be resolved from current evidence, and one recommended test has not been generated yet. The findings below are unaffected.</p>
+          </div>
+          <span style="flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: #4338CA;"><span>Review gaps</span><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.4 2.6L7.8 6l-3.4 3.4"/></svg></span>
+        </div>
+        <section style="display: grid; grid-template-columns: 152px 704px; gap: 40px; padding-bottom: 36px; ">
+          <div>
+            <h2 style="margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -0.012em;">Your advantages</h2>
+            <p style="margin: 7px 0 0; font-size: 13px; line-height: 1.45; color: #5C6270;">Observed differences favouring you</p>
+          </div>
+          <div>
+            <div style="display: flex; gap: 14px; padding: 4px 0 2px;">
+              <span style="flex: none; width: 3px; height: 22px; margin-top: 3px; border-radius: 2px; background: repeating-linear-gradient(#E4E6EB 0 3px, transparent 3px 6px);"></span>
+              <div>
+                <p style="margin: 0; font-size: 15px; line-height: 1.55; color: #5C6270;">No supported finding yet.</p>
+                <p style="margin: 8px 0 0; font-size: 13px; line-height: 1.5; color: #767C8A;">The return-window comparison is still unresolved, so nothing can be listed here. That is a gap in evidence, not a finding that you are behind.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section style="display: grid; grid-template-columns: 152px 704px; gap: 40px; padding: 36px 0; border-top: 1px solid #E9EAEE;">
+          <div>
+            <h2 style="margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -0.012em;">Competitor advantages</h2>
+            <p style="margin: 7px 0 0; font-size: 13px; line-height: 1.45; color: #5C6270;">Observed differences favouring them</p>
+          </div>
+          <div>
+<div style="margin-bottom: 14px; font-size: 13px; color: #767C8A;">2 supported · 1 comparison unresolved</div>
+            <div class="item" tabindex="0" style="display: flex; gap: 14px; padding: 14px 16px 16px; margin: -14px -16px 0; border-radius: 6px;">
+              <span style="flex: none; width: 3px; height: 22px; margin-top: 3px; border-radius: 2px; background: #5B6070;"></span>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; align-items: baseline; gap: 10px;">
+                  <h3 style="margin: 0; font-size: 14px; font-weight: 600;">Free-shipping threshold</h3>
+                  <span style="display: inline-flex; gap: 2px; align-self: center;"><i style="display:block;width:3px;height:10px;border-radius:1px;background:#5B6070;"></i><i style="display:block;width:3px;height:10px;border-radius:1px;background:#5B6070;"></i><i style="display:block;width:3px;height:10px;border-radius:1px;background:#5B6070;"></i></span>
+                  <span class="ev" style="margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: #767C8A;"><span>Evidence</span><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.4 2.6L7.8 6l-3.4 3.4"/></svg></span>
+                </div>
+                <p style="margin: 6px 0 0; font-size: 15px; line-height: 1.55; color: #23262E;">rival.test offers a $50 free-shipping threshold versus your $75 free-shipping threshold.</p>
+                <div style="display: grid; grid-template-columns: 168px 168px auto; margin-top: 13px;">
+                  <div>
+                    <div style="font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: #767C8A;">You</div>
+                    <div style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; font-weight: 500; color: #16181D; margin-top: 4px;">$75</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: #767C8A;">rival.test</div>
+                    <div style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; font-weight: 500; color: #16181D; margin-top: 4px;">$50</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: #767C8A;">Difference</div>
+                    <div style="display: flex; align-items: baseline; gap: 6px; margin-top: 4px;">
+                      <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="#5B6070" stroke-width="1.6" style="align-self: center;"><path d="M5 2v6M2.4 5.6L5 8.2l2.6-2.6"/></svg>
+                      <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; font-weight: 500; color: #16181D;">$25</span>
+                      <span style="font-size: 12px; color: #767C8A;">lower</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="item" tabindex="0" style="display: flex; gap: 14px; padding: 16px; margin: 0 -16px -16px; border-top: 1px solid #F1F2F5; border-radius: 6px;">
+              <span style="flex: none; width: 3px; height: 22px; margin-top: 3px; border-radius: 2px; background: #5B6070;"></span>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; align-items: baseline; gap: 10px;">
+                  <h3 style="margin: 0; font-size: 14px; font-weight: 600;">Subscription availability</h3>
+                  <span style="display: inline-flex; gap: 2px; align-self: center;"><i style="display:block;width:3px;height:10px;border-radius:1px;background:#5B6070;"></i><i style="display:block;width:3px;height:10px;border-radius:1px;background:#5B6070;"></i><i style="display:block;width:3px;height:10px;border-radius:1px;background:#5B6070;"></i></span>
+                  <span class="ev" style="margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: #767C8A;"><span>Evidence</span><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.4 2.6L7.8 6l-3.4 3.4"/></svg></span>
+                </div>
+                <p style="margin: 6px 0 0; font-size: 15px; line-height: 1.55; color: #23262E;">rival.test offers a subscription option while your brand explicitly does not.</p>
+                <div style="display: grid; grid-template-columns: 168px 168px auto; margin-top: 13px;">
+                  <div>
+                    <div style="font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: #767C8A;">You</div>
+                    <div style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; font-weight: 500; color: #16181D; margin-top: 4px;">Not offered</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: #767C8A;">rival.test</div>
+                    <div style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; font-weight: 500; color: #16181D; margin-top: 4px;">Offered</div>
+                  </div>
+                  <div></div>
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 14px; padding: 16px; margin: 0 -16px -16px; border-top: 1px solid #F1F2F5;">
+              <span style="flex: none; width: 3px; height: 22px; margin-top: 3px; border-radius: 2px; background: repeating-linear-gradient(#E4E6EB 0 3px, transparent 3px 6px);"></span>
+              <div style="flex: 1; min-width: 0;">
+                <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: #5C6270;">Guarantee duration</h3>
+                <p style="margin: 6px 0 0; font-size: 15px; line-height: 1.55; color: #5C6270;">Not established — no guarantee evidence has been captured for rival.test yet.</p>
+                <div style="display: grid; grid-template-columns: 168px 168px auto; margin-top: 13px;">
+                  <div>
+                    <div style="font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: #767C8A;">You</div>
+                    <div style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; color: #5C6270; border-bottom: 1px dashed #C7CAD2; padding-bottom: 1px; margin-top: 4px; display: inline-block;">Not established</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: #767C8A;">rival.test</div>
+                    <div style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; color: #5C6270; border-bottom: 1px dashed #C7CAD2; padding-bottom: 1px; margin-top: 4px; display: inline-block;">Not established</div>
+                  </div>
+                  <div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section style="display: grid; grid-template-columns: 152px 704px; gap: 40px; padding: 36px 0; border-top: 1px solid #E9EAEE;">
+          <div>
+            <h2 style="margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -0.012em;">What appears to be working</h2>
+            <p style="margin: 7px 0 0; font-size: 13px; line-height: 1.45; color: #5C6270;">Interpretations. Not proven performance.</p>
+          </div>
+          <div>
+            <div class="item" tabindex="0" style="display: flex; gap: 14px; padding: 14px 16px 16px; margin: -14px -16px 0; border-radius: 6px;">
+              <span style="flex: none; width: 3px; height: 24px; margin-top: 6px; border-left: 1px solid #C7CAD2;"></span>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; align-items: baseline; gap: 10px;">
+                  <span style="font-size: 13px; color: #5C6270;">Possible shipping-friction strategy</span>
+                  <span class="ev" style="margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: #767C8A;"><span>Why this?</span><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.4 2.6L7.8 6l-3.4 3.4"/></svg></span>
+                </div>
+                <p style="margin: 5px 0 0; font-family: Newsreader, Georgia, serif; font-size: 20px; font-weight: 400; line-height: 1.35; letter-spacing: -0.005em; color: #1B1E25;">The competitor may be using a lower free-shipping threshold to reduce purchase friction.</p>
+                <p style="margin: 10px 0 0; font-size: 13px; line-height: 1.5; color: #5C6270;">Public evidence does not establish whether this improves conversion.</p>
+                <div style="margin-top: 10px; font-size: 13px; color: #767C8A;">Based on 1 competitive signal · rival.test</div>
+              </div>
+            </div>
+            <div class="item" tabindex="0" style="display: flex; gap: 14px; padding: 16px; margin: 0 -16px -16px; border-top: 1px solid #F1F2F5; border-radius: 6px;">
+              <span style="flex: none; width: 3px; height: 24px; margin-top: 6px; border-left: 1px solid #C7CAD2;"></span>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; align-items: baseline; gap: 10px;">
+                  <span style="font-size: 13px; color: #5C6270;">Repeat-purchase emphasis</span>
+                  <span class="ev" style="margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: #767C8A;"><span>Why this?</span><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.4 2.6L7.8 6l-3.4 3.4"/></svg></span>
+                </div>
+                <p style="margin: 5px 0 0; font-family: Newsreader, Georgia, serif; font-size: 20px; font-weight: 400; line-height: 1.35; letter-spacing: -0.005em; color: #1B1E25;">The competitor may be emphasizing repeat-purchase mechanics.</p>
+                <p style="margin: 10px 0 0; font-size: 13px; line-height: 1.5; color: #5C6270;">Public evidence does not establish whether this improves retention or lifetime value.</p>
+                <div style="margin-top: 10px; font-size: 13px; color: #767C8A;">Based on 1 competitive signal · rival.test</div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section style="display: grid; grid-template-columns: 152px 704px; gap: 40px; padding: 36px 0; border-top: 1px solid #E9EAEE;">
+          <div>
+            <h2 style="margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -0.012em;">What to test next</h2>
+            <p style="margin: 7px 0 0; font-size: 13px; line-height: 1.45; color: #5C6270;">Tests worth considering. Not committed actions.</p>
+          </div>
+          <div>
+<div style="margin-bottom: 14px; font-size: 13px; color: #767C8A;">1 of 2 shown · 1 awaiting generation</div>
+            <div class="item" tabindex="0" style="display: flex; gap: 14px; padding: 14px 16px 18px; margin: -14px -16px 0; border-radius: 6px;">
+              <span style="flex: none; width: 3px; height: 24px; margin-top: 4px; border-left: 1px solid #C7CAD2;"></span>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; align-items: baseline; gap: 10px;">
+                  <h3 style="margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.008em;">Test a lower free-shipping threshold</h3>
+                  <span class="ev" style="margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: #767C8A;"><span>Why this test?</span><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4.4 2.6L7.8 6l-3.4 3.4"/></svg></span>
+                </div>
+                <p style="margin: 6px 0 0; font-size: 15px; line-height: 1.55; color: #23262E;">Test the current shipping-friction hypothesis with one controlled threshold variant.</p>
+                <div style="display: grid; grid-template-columns: 232px 116px auto; margin-top: 14px;">
+                  <div>
+                    <div style="font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: #767C8A;">Primary metric</div>
+                    <div style="font-size: 13px; font-weight: 500; color: #16181D; margin-top: 4px;">Checkout conversion rate</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: #767C8A;">Guardrails</div>
+                    <div style="font-size: 13px; font-weight: 500; color: #16181D; margin-top: 4px;">3 metrics</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: #767C8A;">Readiness</div>
+                    <div style="font-size: 13px; font-weight: 500; color: #5C6270; margin-top: 4px;">Needs first-party data</div>
+                  </div>
+                </div>
+                <p style="margin: 14px 0 0; padding-left: 12px; border-left: 1px solid #E9EAEE; font-size: 13px; line-height: 1.5; color: #5C6270;">Lower thresholds may increase shipping subsidy and should be evaluated against margin guardrails.</p>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 14px; padding: 18px 16px 16px; margin: 0 -16px -16px; border-top: 1px solid #F1F2F5;">
+              <span style="flex: none; width: 3px; height: 22px; border-radius: 2px; background: repeating-linear-gradient(#E4E6EB 0 3px, transparent 3px 6px);"></span>
+              <div style="flex: 1;">
+                <div style="font-size: 15px; line-height: 1.55; color: #5C6270;">A subscription-availability test is available from the repeat-purchase hypothesis.</div>
+                <div style="margin-top: 4px; font-size: 13px; color: #767C8A;">It has not been generated for this report yet.</div>
+              </div>
+              <span style="flex: none; display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border: 1px solid #E4E6EB; border-radius: 6px; font-size: 13px; color: #23262E; background: #FFFFFF;">Generate</span>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

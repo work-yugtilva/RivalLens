@@ -1,4 +1,109 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+
+/*
+ * Direction A tokens. Values come from docs/design/final/design-spec.md and the
+ * approved HTML in docs/design/final/. `@theme` (not `@theme inline`) is used so
+ * the font families stay as `var()` references and resolve against the
+ * next/font variables set on <html> at runtime.
+ */
+@theme {
+  /* The tablet reference is 834 wide; desktop takes over at 1280. */
+  --breakpoint-tablet: 834px;
+
+  --font-rl-sans: var(--font-instrument-sans), system-ui, -apple-system, sans-serif;
+  --font-rl-serif: var(--font-newsreader), Georgia, serif;
+  --font-rl-mono: var(--font-ibm-plex-mono), ui-monospace, Menlo, monospace;
+
+  --text-11: 11px;
+  --text-12: 12px;
+  --text-13: 13px;
+  --text-14: 14px;
+  --text-15: 15px;
+  --text-16: 16px;
+  --text-17: 17px;
+  --text-19: 19px;
+  --text-20: 20px;
+
+  /* Text. Contrast on white is recorded in the spec's colour table. */
+  --color-rl-ink: #16181d;
+  --color-rl-serif-ink: #1b1e25;
+  --color-rl-body: #23262e;
+  --color-rl-muted: #5c6270;
+  /*
+   * The spec records `faint` as #767C8A at 4.6:1, but the measured ratio on
+   * white is 4.18:1, which fails WCAG AA for the 11-13px text this token
+   * carries. #6B7280 is the same cool grey at 4.83:1 and is used everywhere
+   * the reference HTML writes #767C8A.
+   */
+  --color-rl-faint: #6b7280;
+  --color-rl-nav-idle: #454b59;
+
+  /* Accent and marks. */
+  --color-rl-indigo: #4338ca;
+  --color-rl-indigo-deep: #312e81;
+  --color-rl-graphite: #5b6070;
+
+  /* Rules and non-text greys. #C7CAD2 and lighter are non-text values only. */
+  --color-rl-hairline: #c7cad2;
+  --color-rl-control: #e4e6eb;
+  --color-rl-rule: #e9eaee;
+  --color-rl-rule-item: #f1f2f5;
+  --color-rl-skeleton: #eff0f3;
+
+  /* Surfaces. */
+  --color-rl-ground: #fcfcfd;
+  --color-rl-sidebar: #f7f8fa;
+  --color-rl-row-hover: #fafafb;
+  --color-rl-row-selected: #f5f5fa;
+  --color-rl-nav-selected: #f1f1fb;
+  --color-rl-nav-hover: #eff0f3;
+  --color-rl-ghost-hover: #f1f2f5;
+
+  /* Partial / insufficient notice. Amber, never red. */
+  --color-rl-notice-ground: #fdfbf6;
+  --color-rl-notice-border: #ebe3d3;
+  --color-rl-notice-edge: #c8a96a;
+  --color-rl-notice-icon: #8a6e3b;
+  --color-rl-notice-title: #3f3524;
+  --color-rl-notice-body: #6b5b3c;
+  --color-rl-notice-count: #7a6236;
+  --color-rl-notice-ring: #a98a4b;
+
+  /* Load failure. Reserved for the error state, never for competitor advantage. */
+  --color-rl-error: #9c5a4a;
+}
+
+/*
+ * Minimal shadcn/ui token surface, mapped onto the Direction A palette so any
+ * primitive chrome that is not explicitly restyled still lands on-palette.
+ */
+@theme {
+  --color-background: #ffffff;
+  --color-foreground: #16181d;
+  --color-card: #ffffff;
+  --color-card-foreground: #16181d;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #16181d;
+  --color-primary: #4338ca;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #f1f2f5;
+  --color-secondary-foreground: #23262e;
+  --color-muted: #f7f8fa;
+  --color-muted-foreground: #5c6270;
+  --color-accent: #eff0f3;
+  --color-accent-foreground: #16181d;
+  --color-destructive: #9c5a4a;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e9eaee;
+  --color-input: #e4e6eb;
+  --color-ring: #4338ca;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+}
 
 :root {
   color-scheme: light;
@@ -6,7 +111,9 @@
   --foreground: #171717;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 body {
   margin: 0;
@@ -15,4 +122,58 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-button, input { font: inherit; }
+button,
+input {
+  font: inherit;
+}
+
+/* Report surface. Matches the `.rl` root in the approved HTML. */
+.rl-surface {
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes rl-sheet-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes rl-sheet-out-right {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes rl-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rl-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
