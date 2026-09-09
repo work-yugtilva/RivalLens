@@ -14,6 +14,11 @@ export type IntelligenceModelParameters = {
   readonly maxOutputTokens?: number;
 };
 
+export const DEFAULT_MAX_OUTPUT_TOKENS = 2048;
+export const MAX_OUTPUT_TOKENS = 2048;
+export const MIN_TEMPERATURE = 0;
+export const MAX_TEMPERATURE = 1;
+
 export type IntelligenceRequest<TSchema extends z.ZodTypeAny> = {
   readonly promptVersion: string;
   readonly systemPrompt: string;
@@ -28,11 +33,12 @@ export type IntelligenceResponseTelemetry = {
   readonly providerId: string;
   readonly modelId: string;
   readonly latencyMs: number;
-  readonly inputTokens?: number;
-  readonly outputTokens?: number;
-  readonly estimatedCostUsd?: number;
-  readonly rawResponseId?: string;
-  readonly finishReason?: string;
+  readonly inputTokens: number | null;
+  readonly outputTokens: number | null;
+  readonly totalTokens: number | null;
+  readonly estimatedCostUsd: number | null;
+  readonly rawResponseId: string | null;
+  readonly finishReason: string | null;
 };
 
 export type IntelligenceResponse = {
@@ -49,14 +55,31 @@ export interface IntelligenceModelProvider {
   ): Promise<IntelligenceResponse>;
 }
 
-export type IntelligenceProviderErrorCode = 'provider_exception' | 'timeout';
+export type IntelligenceProviderErrorCode =
+  | 'timeout'
+  | 'rate_limit'
+  | 'provider_unavailable'
+  | 'authentication_configuration'
+  | 'invalid_request'
+  | 'provider_exception';
+
+export type IntelligenceProviderErrorMetadata = {
+  readonly httpStatus?: number;
+  readonly providerRequestId?: string;
+};
 
 export class IntelligenceProviderError extends Error {
   readonly code: IntelligenceProviderErrorCode;
+  readonly metadata?: IntelligenceProviderErrorMetadata;
 
-  constructor(code: IntelligenceProviderErrorCode, message: string) {
+  constructor(
+    code: IntelligenceProviderErrorCode,
+    message: string,
+    metadata?: IntelligenceProviderErrorMetadata,
+  ) {
     super(message);
     this.name = 'IntelligenceProviderError';
     this.code = code;
+    this.metadata = metadata;
   }
 }

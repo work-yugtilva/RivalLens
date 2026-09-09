@@ -21,6 +21,7 @@ import {
   type IntelligenceModelParameters,
   type IntelligenceModelProvider,
   type IntelligenceProviderErrorCode,
+  type IntelligenceProviderErrorMetadata,
   type IntelligenceResponseTelemetry,
 } from './provider';
 
@@ -64,6 +65,7 @@ export type SafeAttemptSummary = {
   readonly retryReason?: RetryReason;
   readonly telemetry?: IntelligenceResponseTelemetry;
   readonly providerFailure?: IntelligenceProviderErrorCode;
+  readonly providerFailureMetadata?: IntelligenceProviderErrorMetadata;
   readonly validation?: {
     readonly status: IntelligenceValidationResult['status'];
     readonly errorCodes: IntelligenceValidationErrorCode[];
@@ -144,7 +146,7 @@ export function decideRepairAction(validation: IntelligenceValidationResult): Re
 }
 
 export function isProviderFailureRetryable(code: IntelligenceProviderErrorCode): boolean {
-  return code === 'timeout';
+  return code === 'timeout' || code === 'provider_unavailable';
 }
 
 function canInvokeProvider(attempts: SafeAttemptSummary[]): boolean {
@@ -239,6 +241,7 @@ async function generateAttempt(input: {
         kind: input.kind,
         ...(input.retryReason ? { retryReason: input.retryReason } : {}),
         providerFailure: providerError?.code ?? 'provider_exception',
+        ...(providerError?.metadata ? { providerFailureMetadata: providerError.metadata } : {}),
       },
     };
   }

@@ -14,6 +14,7 @@ import {
   type IntelligenceModelParameters,
   type IntelligenceModelProvider,
   type IntelligenceProviderErrorCode,
+  type IntelligenceProviderErrorMetadata,
   type IntelligenceResponseTelemetry,
 } from './provider';
 
@@ -41,6 +42,7 @@ type ProviderFailure = {
   providerId: string;
   modelId: string;
   message: string;
+  metadata?: IntelligenceProviderErrorMetadata;
 };
 
 type ValidatedIntelligence = {
@@ -111,6 +113,7 @@ export async function generateIntelligence(
       providerId: input.provider.providerId,
       modelId: input.provider.modelId,
       message: providerError?.message ?? 'The intelligence provider failed to generate output',
+      ...(providerError?.metadata ? { metadata: providerError.metadata } : {}),
     };
   }
 }

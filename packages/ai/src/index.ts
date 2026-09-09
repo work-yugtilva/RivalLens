@@ -28,10 +28,15 @@ export {
 } from './mock-provider';
 export {
   IntelligenceProviderError,
+  DEFAULT_MAX_OUTPUT_TOKENS,
+  MAX_OUTPUT_TOKENS,
+  MAX_TEMPERATURE,
+  MIN_TEMPERATURE,
   type DeepReadonly,
   type IntelligenceModelParameters,
   type IntelligenceModelProvider,
   type IntelligenceProviderErrorCode,
+  type IntelligenceProviderErrorMetadata,
   type IntelligenceRequest,
   type IntelligenceResponse,
   type IntelligenceResponseTelemetry,
