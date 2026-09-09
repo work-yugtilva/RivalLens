@@ -382,22 +382,27 @@ function expectedDirection(value: number, relative: boolean): GroundedNumericCla
   return value > 0 ? 'increase' : 'decrease';
 }
 
-function inferChangeUnit(factType: string): GroundedNumericClaim['unit'] | undefined {
-  if (/discount|percent/i.test(factType)) return 'percent';
-  if (/duration|window/i.test(factType)) return 'days';
-  if (/price|shipping/i.test(factType)) return 'usd';
-  return undefined;
+const CHANGE_FIELD_UNITS = new Map<string, GroundedNumericClaim['unit']>([
+  ['offer.free_shipping\u0000threshold', 'usd'],
+  ['policy.guarantee\u0000durationDays', 'days'],
+  ['policy.return_window\u0000durationDays', 'days'],
+  ['subscription.details\u0000discountPercent', 'percent'],
+]);
+
+function changeFieldUnit(
+  change: ContextObservedChange,
+  field: string,
+): GroundedNumericClaim['unit'] | undefined {
+  return CHANGE_FIELD_UNITS.get(`${change.factType}\u0000${field}`);
 }
 
-function numbersIn(value: Record<string, unknown> | null): number[] {
-  if (!value) return [];
-  return Object.values(value).flatMap((entry) =>
-    typeof entry === 'number' && Number.isFinite(entry)
-      ? [entry]
-      : isRecord(entry)
-        ? numbersIn(entry)
-        : [],
-  );
+function numericChangeField(
+  value: Record<string, unknown> | null,
+  field: string,
+): number | undefined {
+  if (!value || !Object.hasOwn(value, field)) return undefined;
+  const candidate = value[field];
+  return typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : undefined;
 }
 
 function validateNumericClaim(
@@ -451,16 +456,19 @@ function validateNumericClaim(
       relativeDirection = true;
     }
   } else if (change) {
-    const previous = numbersIn(change.beforeValue);
-    const current = numbersIn(change.afterValue);
-    expectedUnit = inferChangeUnit(change.factType);
-    if (claim.valueRole === 'previous' && previous.includes(claim.value))
-      expectedValue = claim.value;
-    if (claim.valueRole === 'current' && current.includes(claim.value)) expectedValue = claim.value;
-    if (claim.valueRole === 'delta') {
-      const deltas = current.flatMap((right) => previous.map((left) => right - left));
-      if (deltas.includes(claim.value)) expectedValue = claim.value;
-      directionValue = claim.value;
+    const field = claim.field;
+    if (field) {
+      expectedUnit = changeFieldUnit(change, field);
+      if (expectedUnit !== undefined) {
+        const previous = numericChangeField(change.beforeValue, field);
+        const current = numericChangeField(change.afterValue, field);
+        if (claim.valueRole === 'previous' && previous !== undefined) expectedValue = previous;
+        if (claim.valueRole === 'current' && current !== undefined) expectedValue = current;
+        if (claim.valueRole === 'delta' && previous !== undefined && current !== undefined) {
+          expectedValue = current - previous;
+          directionValue = current - previous;
+        }
+      }
     }
   }
 
@@ -524,28 +532,155 @@ function validateNumericClaim(
 }
 
 const CERTAINTY_PATTERN = /\b(?:will|guarantees?|proves?|causes?|certainly|definitely|always)\b/i;
-const NUMBER_PATTERN = /[-+]?\d+(?:\.\d+)?/g;
+const NUMBER_PATTERN = /\$?([-+]?\d+(?:\.\d+)?)(?:\s*(percentage points|%|percent|days|usd))?/gi;
+const DOMAIN_PATTERN = /\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi;
+
+function sentenceAt(text: string, index: number): string {
+  let start = 0;
+  let end = text.length;
+  for (let position = 0; position < text.length; position += 1) {
+    const next = text[position + 1];
+    const isBoundary =
+      /[.!?]/.test(text[position]!) && (next === undefined || /\s/.test(next));
+    if (!isBoundary) continue;
+    if (position < index) start = position + 1;
+    else {
+      end = position;
+      break;
+    }
+  }
+  return text.slice(start, end).toLowerCase();
+}
+
+function proseUnit(value: string): GroundedNumericClaim['unit'] | undefined {
+  const normalized = value.toLowerCase();
+  if (normalized.includes('percentage points')) return 'percentage_points';
+  if (normalized.includes('%') || /\bpercent\b/.test(normalized)) return 'percent';
+  if (/\bdays?\b/.test(normalized)) return 'days';
+  if (normalized.includes('$') || /\busd\b/.test(normalized)) return 'usd';
+  return undefined;
+}
+
+function proseDirection(
+  sentence: string,
+  subjectRoles: { owned: boolean; competitor: boolean },
+): GroundedNumericClaim['direction'] | undefined {
+  if (subjectRoles.competitor && /\blower\b/.test(sentence)) {
+    return 'competitor_lower';
+  }
+  if (subjectRoles.competitor && /\bhigher\b/.test(sentence)) {
+    return 'competitor_higher';
+  }
+  if (subjectRoles.owned && /\blower\b/.test(sentence)) {
+    return 'competitor_higher';
+  }
+  if (subjectRoles.owned && /\bhigher\b/.test(sentence)) {
+    return 'competitor_lower';
+  }
+  if (/\b(?:increase|increased|increasing|rise|rose)\b/.test(sentence)) return 'increase';
+  if (/\b(?:decrease|decreased|decreasing|drop|dropped|reduce|reduced)\b/.test(sentence)) {
+    return 'decrease';
+  }
+  return undefined;
+}
+
+function mentionedSubjectIds(sentence: string, indexes: ContextIndexes): Set<string> {
+  const subjects = new Set<string>();
+  if (sentence.includes(indexes.context.brand.domain.toLowerCase())) {
+    subjects.add(indexes.context.brand.id);
+  }
+  for (const competitor of indexes.context.competitors) {
+    if (sentence.includes(competitor.domain.toLowerCase())) subjects.add(competitor.id);
+  }
+  return subjects;
+}
+
+function proseSubjectRoles(
+  sentence: string,
+  mentionedSubjects: Set<string>,
+  indexes: ContextIndexes,
+): { owned: boolean; competitor: boolean } {
+  return {
+    owned:
+      mentionedSubjects.has(indexes.context.brand.id) || /\b(?:our|we|us|owned)\b/.test(sentence),
+    competitor:
+      [...mentionedSubjects].some((subjectId) => subjectId !== indexes.context.brand.id) ||
+      /\b(?:competitor|rival)\b/.test(sentence),
+  };
+}
+
+function numericClaimSubjectId(claim: GroundedNumericClaim, indexes: ContextIndexes): string {
+  return claim.valueRole === 'owned' ? indexes.context.brand.id : claim.reference.subjectId;
+}
+
+function knownDomainErrors(
+  texts: string[],
+  indexes: ContextIndexes,
+  path: Array<string | number>,
+  code: IntelligenceValidationErrorCode,
+  message: string,
+): IntelligenceValidationError[] {
+  const knownDomains = new Set([
+    indexes.context.brand.domain.toLowerCase(),
+    ...indexes.context.competitors.map((competitor) => competitor.domain.toLowerCase()),
+  ]);
+  const mentionedDomains = texts
+    .flatMap((text) => text.match(DOMAIN_PATTERN) ?? [])
+    .map((domain) => domain.toLowerCase());
+  return mentionedDomains.some((domain) => !knownDomains.has(domain))
+    ? [validationError(code, path, message)]
+    : [];
+}
 
 function unsupportedProseNumberErrors(
   texts: string[],
   claims: GroundedNumericClaim[],
+  indexes: ContextIndexes,
   path: Array<string | number>,
 ): IntelligenceValidationError[] {
-  const supported = claims.flatMap((claim) => [claim.value, Math.abs(claim.value)]);
-  const values = texts.flatMap((text) =>
-    [...text.matchAll(NUMBER_PATTERN)].map((match) => Number(match[0])),
-  );
-  return values.flatMap((value) =>
-    supported.includes(value) || supported.includes(Math.abs(value))
-      ? []
-      : [
+  const errors: IntelligenceValidationError[] = [];
+  for (const text of texts) {
+    for (const match of text.matchAll(NUMBER_PATTERN)) {
+      const value = Number(match[1]);
+      const sentence = sentenceAt(text, match.index ?? 0);
+      const unit = proseUnit(match[0]);
+      const subjects = mentionedSubjectIds(sentence, indexes);
+      const subjectRoles = proseSubjectRoles(sentence, subjects, indexes);
+      const direction = proseDirection(sentence, subjectRoles);
+      const supported = claims.some((claim) => {
+        if (unit !== undefined && claim.unit !== unit) return false;
+        if (subjects.size === 1 && !subjects.has(numericClaimSubjectId(claim, indexes))) {
+          return false;
+        }
+        if (claim.valueRole !== 'delta') {
+          const subjectId = numericClaimSubjectId(claim, indexes);
+          if (subjectRoles.owned && subjectId !== indexes.context.brand.id) return false;
+          if (subjectRoles.competitor && subjectId === indexes.context.brand.id) return false;
+        } else if ((subjectRoles.owned || subjectRoles.competitor) && direction === undefined) {
+          return false;
+        }
+        if (direction !== undefined && claim.direction !== direction) return false;
+        if (claim.value === value) return true;
+        return (
+          direction !== undefined &&
+          value >= 0 &&
+          claim.value < 0 &&
+          Math.abs(claim.value) === value &&
+          claim.direction === direction
+        );
+      });
+      if (!supported) {
+        errors.push(
           validationError(
             'UNSUPPORTED_NUMERIC_CLAIM',
             path,
             `Prose number ${value} has no matching structured numeric claim`,
           ),
-        ],
-  );
+        );
+      }
+    }
+  }
+  return errors;
 }
 
 function validateHypothesis(
@@ -658,20 +793,37 @@ function validateHypothesis(
     );
   }
 
+  const validNumericClaims: GroundedNumericClaim[] = [];
   for (const [numericIndex, claim] of hypothesis.numericClaims.entries()) {
-    errors.push(
-      ...validateNumericClaim(
-        claim,
-        indexes,
-        [...path, 'numericClaims', numericIndex],
-        hypothesis.competitorId,
-      ),
+    const numericErrors = validateNumericClaim(
+      claim,
+      indexes,
+      [...path, 'numericClaims', numericIndex],
+      hypothesis.competitorId,
     );
+    errors.push(...numericErrors);
+    if (numericErrors.length === 0) validNumericClaims.push(claim);
   }
+  const texts = [
+    hypothesis.statement,
+    hypothesis.rationale,
+    hypothesis.uncertainty.statement,
+    ...hypothesis.assumptions,
+  ];
+  errors.push(
+    ...knownDomainErrors(
+      texts,
+      indexes,
+      [...path, 'prose'],
+      'EVIDENCE_DEPENDENCY_MISMATCH',
+      'The hypothesis names a domain that is absent from the context',
+    ),
+  );
   errors.push(
     ...unsupportedProseNumberErrors(
-      [hypothesis.statement, hypothesis.rationale, ...hypothesis.assumptions],
-      hypothesis.numericClaims,
+      texts,
+      validNumericClaims,
+      indexes,
       [...path, 'prose'],
     ),
   );
@@ -707,6 +859,7 @@ function validateExperiment(
   indexes: ContextIndexes,
   hypotheses: Array<LlmStrategicHypothesisOutput | undefined>,
   hypothesisResults: IndexedItemValidationResult[],
+  hypothesisIndexesByRef: Map<string, number>,
 ): IntelligenceValidationError[] {
   const path = ['experiments', index];
   const errors: IntelligenceValidationError[] = [];
@@ -715,21 +868,23 @@ function validateExperiment(
       validationError('UNKNOWN_COMPETITOR_ID', [...path, 'competitorId'], 'Unknown competitor'),
     );
   }
-  const hypothesis = hypotheses[experiment.hypothesisIndex];
-  const hypothesisResult = hypothesisResults[experiment.hypothesisIndex];
+  const hypothesisIndex = hypothesisIndexesByRef.get(experiment.hypothesisRef);
+  const hypothesis = hypothesisIndex === undefined ? undefined : hypotheses[hypothesisIndex];
+  const hypothesisResult =
+    hypothesisIndex === undefined ? undefined : hypothesisResults[hypothesisIndex];
   if (!hypothesis || !hypothesisResult) {
     errors.push(
       validationError(
         'INVALID_HYPOTHESIS_REFERENCE',
-        [...path, 'hypothesisIndex'],
-        'The hypothesis index does not exist',
+        [...path, 'hypothesisRef'],
+        'The hypothesis ref does not exist or is ambiguous',
       ),
     );
   } else if (hypothesisResult.status === 'rejected') {
     errors.push(
       validationError(
         'EXPERIMENT_DEPENDS_ON_INVALID_HYPOTHESIS',
-        [...path, 'hypothesisIndex'],
+        [...path, 'hypothesisRef'],
         'The referenced hypothesis did not pass validation',
       ),
     );
@@ -742,11 +897,58 @@ function validateExperiment(
       ),
     );
   }
-  if (
-    CERTAINTY_PATTERN.test(
-      `${experiment.objective} ${experiment.hypothesisUnderTest} ${experiment.design.controlDescription} ${experiment.design.treatmentDescription}`,
-    )
-  ) {
+
+  for (const [referenceIndex, reference] of experiment.claimReferences.entries()) {
+    const result = resolveReference(
+      reference,
+      indexes,
+      [...path, 'claimReferences', referenceIndex],
+      experiment.competitorId,
+    );
+    if (result.errors.length > 0) {
+      errors.push(...result.errors);
+      errors.push(
+        validationError(
+          'UNSUPPORTED_EXPERIMENT_CLAIM',
+          [...path, 'claimReferences', referenceIndex],
+          'An experiment claim reference did not validate',
+        ),
+      );
+    }
+  }
+
+  const validNumericClaims: GroundedNumericClaim[] = [];
+  for (const [numericIndex, claim] of experiment.numericClaims.entries()) {
+    const numericErrors = validateNumericClaim(
+      claim,
+      indexes,
+      [...path, 'numericClaims', numericIndex],
+      experiment.competitorId,
+    );
+    errors.push(...numericErrors);
+    if (numericErrors.length === 0) validNumericClaims.push(claim);
+    else {
+      errors.push(
+        validationError(
+          'UNSUPPORTED_EXPERIMENT_CLAIM',
+          [...path, 'numericClaims', numericIndex],
+          'An experiment numeric claim did not validate',
+        ),
+      );
+    }
+  }
+
+  const texts = [
+    experiment.title,
+    experiment.objective,
+    experiment.hypothesisUnderTest,
+    experiment.variableUnderTest,
+    experiment.design.controlDescription,
+    experiment.design.treatmentDescription,
+    ...experiment.implementationNotes,
+    experiment.caveat.statement,
+  ];
+  if (CERTAINTY_PATTERN.test(texts.join(' '))) {
     errors.push(
       validationError(
         'EXPERIMENT_NOT_FRAMED_AS_TEST',
@@ -755,15 +957,40 @@ function validateExperiment(
       ),
     );
   }
-  const designText = `${experiment.design.controlDescription} ${experiment.design.treatmentDescription}`;
+  const experimentText = texts.join(' ');
   const competitorPerformancePattern =
     /\b(?:competitor|rival)\b[^.]*\b(?:conversion|revenue|sales|margin|performance|lift|rate)\b|\b(?:conversion|revenue|sales|margin|performance|lift|rate)\b[^.]*\b(?:competitor|rival)\b/i;
-  if (competitorPerformancePattern.test(designText)) {
+  if (competitorPerformancePattern.test(experimentText)) {
     errors.push(
       validationError(
         'UNSUPPORTED_EXPERIMENT_CLAIM',
         [...path, 'design'],
         'Experiment design cannot introduce competitor performance evidence',
+      ),
+    );
+  }
+  errors.push(
+    ...knownDomainErrors(
+      texts,
+      indexes,
+      [...path, 'prose'],
+      'UNSUPPORTED_EXPERIMENT_CLAIM',
+      'The experiment names a domain that is absent from the context',
+    ),
+  );
+  const proseNumericErrors = unsupportedProseNumberErrors(
+    texts,
+    validNumericClaims,
+    indexes,
+    [...path, 'prose'],
+  );
+  errors.push(...proseNumericErrors);
+  if (proseNumericErrors.length > 0) {
+    errors.push(
+      validationError(
+        'UNSUPPORTED_EXPERIMENT_CLAIM',
+        [...path, 'prose'],
+        'The experiment introduces an unsupported numeric claim',
       ),
     );
   }
@@ -792,16 +1019,26 @@ function validateBriefing(
   briefing: LlmExecutiveBriefing,
   indexes: ContextIndexes,
   hypothesisResults: IndexedItemValidationResult[],
+  hypothesisIndexesByRef: Map<string, number>,
 ): IntelligenceValidationError[] {
   const path = ['executiveBriefing'];
   const errors: IntelligenceValidationError[] = [];
-  for (const hypothesisIndex of briefing.supportingHypothesisIndexes) {
-    if (hypothesisResults[hypothesisIndex]?.status !== 'accepted') {
+  for (const hypothesisRef of briefing.supportingHypothesisRefs) {
+    const hypothesisIndex = hypothesisIndexesByRef.get(hypothesisRef);
+    if (hypothesisIndex === undefined) {
+      errors.push(
+        validationError(
+          'INVALID_HYPOTHESIS_REFERENCE',
+          [...path, 'supportingHypothesisRefs'],
+          `Hypothesis ref ${hypothesisRef} is missing or ambiguous`,
+        ),
+      );
+    } else if (hypothesisResults[hypothesisIndex]?.status !== 'accepted') {
       errors.push(
         validationError(
           'UNSUPPORTED_BRIEFING_CLAIM',
-          [...path, 'supportingHypothesisIndexes'],
-          `Hypothesis ${hypothesisIndex} is missing or invalid`,
+          [...path, 'supportingHypothesisRefs'],
+          `Hypothesis ref ${hypothesisRef} is invalid`,
         ),
       );
     }
@@ -823,6 +1060,7 @@ function validateBriefing(
       );
     }
   }
+  const validNumericClaims: GroundedNumericClaim[] = [];
   for (const [numericIndex, claim] of briefing.numericClaims.entries()) {
     const numericErrors = validateNumericClaim(claim, indexes, [
       ...path,
@@ -830,7 +1068,8 @@ function validateBriefing(
       numericIndex,
     ]);
     errors.push(...numericErrors);
-    if (numericErrors.length > 0) {
+    if (numericErrors.length === 0) validNumericClaims.push(claim);
+    else {
       errors.push(
         validationError(
           'UNSUPPORTED_BRIEFING_CLAIM',
@@ -841,23 +1080,16 @@ function validateBriefing(
     }
   }
   const texts = [briefing.headline, briefing.strategicPostureSummary, briefing.keyTakeaway];
-  const knownDomains = new Set([
-    indexes.context.brand.domain.toLowerCase(),
-    ...indexes.context.competitors.map((competitor) => competitor.domain.toLowerCase()),
-  ]);
-  const mentionedDomains = texts
-    .flatMap((text) => text.match(/\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi) ?? [])
-    .map((domain) => domain.toLowerCase());
-  if (mentionedDomains.some((domain) => !knownDomains.has(domain))) {
-    errors.push(
-      validationError(
-        'UNSUPPORTED_BRIEFING_CLAIM',
-        [...path, 'prose'],
-        'The briefing names a competitor that is absent from the context',
-      ),
-    );
-  }
-  const numericErrors = unsupportedProseNumberErrors(texts, briefing.numericClaims, [
+  errors.push(
+    ...knownDomainErrors(
+      texts,
+      indexes,
+      [...path, 'prose'],
+      'UNSUPPORTED_BRIEFING_CLAIM',
+      'The briefing names a domain that is absent from the context',
+    ),
+  );
+  const numericErrors = unsupportedProseNumberErrors(texts, validNumericClaims, indexes, [
     ...path,
     'prose',
   ]);
@@ -919,10 +1151,30 @@ export function validateIntelligenceSynthesis(
   const hypothesisValues = parsedHypotheses.map((result) =>
     result.success ? result.data : undefined,
   );
+  const hypothesisIndexesByRef = new Map<string, number[]>();
+  for (const [index, hypothesis] of hypothesisValues.entries()) {
+    if (!hypothesis) continue;
+    const refs = hypothesisIndexesByRef.get(hypothesis.ref) ?? [];
+    refs.push(index);
+    hypothesisIndexesByRef.set(hypothesis.ref, refs);
+  }
+  const uniqueHypothesisIndexesByRef = new Map<string, number>();
+  for (const [ref, indexesForRef] of hypothesisIndexesByRef) {
+    if (indexesForRef.length === 1) uniqueHypothesisIndexesByRef.set(ref, indexesForRef[0]!);
+  }
   const hypotheses = parsedHypotheses.map((result, index): IndexedItemValidationResult => {
     const errors = result.success
       ? validateHypothesis(result.data, index, indexes)
       : schemaErrors('INVALID_OUTPUT_SCHEMA', ['hypotheses', index], result.error.issues);
+    if (result.success && (hypothesisIndexesByRef.get(result.data.ref)?.length ?? 0) > 1) {
+      errors.push(
+        validationError(
+          'INVALID_HYPOTHESIS_REFERENCE',
+          ['hypotheses', index, 'ref'],
+          `Hypothesis ref ${result.data.ref} is duplicated`,
+        ),
+      );
+    }
     return { index, status: errors.length === 0 ? 'accepted' : 'rejected', errors };
   });
 
@@ -932,7 +1184,14 @@ export function validateIntelligenceSynthesis(
   const experiments = parsedExperiments.map((result, index): IndexedItemValidationResult => {
     let errors: IntelligenceValidationError[];
     if (result.success) {
-      errors = validateExperiment(result.data, index, indexes, hypothesisValues, hypotheses);
+      errors = validateExperiment(
+        result.data,
+        index,
+        indexes,
+        hypothesisValues,
+        hypotheses,
+        uniqueHypothesisIndexesByRef,
+      );
     } else {
       errors = schemaErrors('INVALID_OUTPUT_SCHEMA', ['experiments', index], result.error.issues);
       const duplicate = duplicateMetricError(rawExperiments[index], index);
@@ -957,7 +1216,7 @@ export function validateIntelligenceSynthesis(
 
   const parsedBriefing = llmExecutiveBriefingSchema.safeParse(rawBriefing);
   const briefingErrors = parsedBriefing.success
-    ? validateBriefing(parsedBriefing.data, indexes, hypotheses)
+    ? validateBriefing(parsedBriefing.data, indexes, hypotheses, uniqueHypothesisIndexesByRef)
     : schemaErrors('INVALID_OUTPUT_SCHEMA', ['executiveBriefing'], parsedBriefing.error.issues);
   const executiveBriefing: ItemValidationResult = {
     status: briefingErrors.length === 0 ? 'accepted' : 'rejected',
@@ -978,10 +1237,7 @@ export function validateIntelligenceSynthesis(
             return false;
           }
           if (section === 'executiveBriefing' && issue.path.length > 1) return false;
-          return (
-            issue.path.length === 0 ||
-            !['hypotheses', 'experiments', 'executiveBriefing'].includes(String(section))
-          );
+          return true;
         }),
       );
   const errors = [

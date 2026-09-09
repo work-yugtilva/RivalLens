@@ -15,6 +15,7 @@ import {
 
 const uuid = z.string().uuid();
 const timestamp = z.string().datetime({ offset: true });
+const hypothesisRef = z.string().regex(/^h[1-9]\d*$/);
 
 export const epistemicClassSchema = z.enum(['observed', 'derived', 'estimated', 'reported']);
 export type EpistemicClass = z.infer<typeof epistemicClassSchema>;
@@ -106,7 +107,7 @@ export const contextUntrustedSnippetSchema = z
     observationId: uuid.nullable(),
     field: z.string().min(1),
     text: z.string().min(1).max(500),
-    epistemicClass: z.literal('observed'),
+    epistemicClass: z.literal('reported'),
   })
   .strict();
 
@@ -242,12 +243,30 @@ export const groundedNumericClaimSchema = z
     direction: z
       .enum(['competitor_lower', 'competitor_higher', 'increase', 'decrease', 'equal'])
       .optional(),
+    field: z.string().regex(/^[A-Za-z][A-Za-z0-9_]*$/).optional(),
     reference: groundedClaimReferenceSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((claim, context) => {
+    if (claim.valueRole === 'delta' && claim.direction === undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['direction'],
+        message: 'Delta claims must declare a direction',
+      });
+    }
+    if (claim.reference.kind === 'change' && claim.field === undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['field'],
+        message: 'Change-backed numeric claims must declare a field',
+      });
+    }
+  });
 
 export const llmStrategicHypothesisOutputSchema = z
   .object({
+    ref: hypothesisRef,
     competitorId: uuid,
     theme: llmStrategicHypothesisThemeSchema,
     statement: z.string().min(10).max(300),
@@ -280,7 +299,7 @@ export const llmStrategicHypothesisOutputSchema = z
 export const llmRecommendedExperimentOutputSchema = z
   .object({
     competitorId: uuid,
-    hypothesisIndex: z.number().int().nonnegative(),
+    hypothesisRef,
     title: z.string().min(10).max(150),
     objective: z.string().min(15).max(400),
     hypothesisUnderTest: z.string().min(20).max(500),
@@ -314,6 +333,8 @@ export const llmRecommendedExperimentOutputSchema = z
         statement: z.string().min(10).max(400),
       })
       .strict(),
+    claimReferences: z.array(groundedClaimReferenceSchema).min(1).max(30),
+    numericClaims: z.array(groundedNumericClaimSchema).max(20),
   })
   .strict()
   .refine(
@@ -326,12 +347,12 @@ export const llmExecutiveBriefingSchema = z
     headline: z.string().min(10).max(150),
     strategicPostureSummary: z.string().min(30).max(600),
     keyTakeaway: z.string().min(20).max(400),
-    supportingHypothesisIndexes: z
-      .array(z.number().int().nonnegative())
+    supportingHypothesisRefs: z
+      .array(hypothesisRef)
       .max(5)
       .refine(
-        (indexes) => new Set(indexes).size === indexes.length,
-        'Supporting hypothesis indexes must be unique',
+        (refs) => new Set(refs).size === refs.length,
+        'Supporting hypothesis refs must be unique',
       ),
     claimReferences: z.array(groundedClaimReferenceSchema).max(30),
     numericClaims: z.array(groundedNumericClaimSchema).max(20),
@@ -339,7 +360,7 @@ export const llmExecutiveBriefingSchema = z
   .strict()
   .refine(
     (briefing) =>
-      briefing.supportingHypothesisIndexes.length > 0 || briefing.claimReferences.length > 0,
+      briefing.supportingHypothesisRefs.length > 0 || briefing.claimReferences.length > 0,
     'Executive briefing must declare at least one source of support',
   );
 

@@ -6,7 +6,13 @@ import type {
   IntelligenceContext,
   LlmIntelligenceSynthesisOutput,
 } from '../../packages/schemas/src';
-import { BRAND_ID, COMPETITOR_ID, GENERATED_AT, reportInput } from './fixtures/competitive-reports';
+import {
+  BRAND_ID,
+  COMPETITOR_ID,
+  GENERATED_AT,
+  reportInput,
+  uuid,
+} from './fixtures/competitive-reports';
 
 type Validator = (input: { context: unknown; output: unknown }) => {
   status: 'passed' | 'partial' | 'failed';
@@ -58,12 +64,13 @@ function fixture(): {
         strategicPostureSummary:
           'The available evidence supports testing a lower shipping threshold for this market.',
         keyTakeaway: 'Treat the competitive pattern as a testable signal, not a known outcome.',
-        supportingHypothesisIndexes: [0],
+        supportingHypothesisRefs: ['h1'],
         claimReferences: [comparisonReference],
         numericClaims: [],
       },
       hypotheses: [
         {
+          ref: 'h1',
           competitorId: COMPETITOR_ID,
           theme: 'shipping_friction',
           statement: 'The competitor may be using shipping policy to reduce purchase friction.',
@@ -85,7 +92,7 @@ function fixture(): {
       experiments: [
         {
           competitorId: COMPETITOR_ID,
-          hypothesisIndex: 0,
+          hypothesisRef: 'h1',
           title: 'Test a lower free shipping threshold',
           objective: 'Measure whether a threshold change affects checkout behavior.',
           hypothesisUnderTest:
@@ -107,6 +114,8 @@ function fixture(): {
             category: 'shipping_margin_exposure',
             statement: 'A lower threshold may increase shipping subsidy costs.',
           },
+          claimReferences: [comparisonReference],
+          numericClaims: [],
         },
       ],
     },
@@ -146,6 +155,41 @@ function percentageFixture() {
   output.hypotheses[0]!.claimReferences = [signalReference];
   output.executiveBriefing.claimReferences = [signalReference];
   return { context, output, numericReference: signalReference };
+}
+
+function changeFixture() {
+  const input = fixture();
+  const changeId = uuid(701);
+  input.context.recentChanges = [
+    {
+      id: changeId,
+      subjectId: COMPETITOR_ID,
+      subjectRole: 'competitor',
+      factType: 'offer.free_shipping',
+      changeType: 'offer.free_shipping.threshold_changed',
+      detectedAt: GENERATED_AT,
+      beforeValue: { threshold: 75, unrelated: 11 },
+      afterValue: { threshold: 50, unrelated: 99 },
+      epistemicClass: 'derived',
+      evidence: {
+        sourceId: uuid(901),
+        currentSnapshotId: uuid(911),
+        previousSnapshotId: uuid(910),
+        currentObservationId: uuid(1002),
+        previousObservationId: uuid(1001),
+      },
+    },
+  ];
+  return {
+    input,
+    reference: {
+      kind: 'change' as const,
+      changeId,
+      subjectId: COMPETITOR_ID,
+      assertion: 'fact' as const,
+      claimedEpistemicClass: 'derived' as const,
+    },
+  };
 }
 
 describe('validateIntelligenceSynthesis', () => {
@@ -391,25 +435,28 @@ describe('validateIntelligenceSynthesis', () => {
     expect(result.hypotheses[0]!.errors.map((error) => error.code)).toContain('UNKNOWN_AS_ABSENCE');
   });
 
-  it('rejects an experiment whose hypothesis failed while retaining independent valid items', () => {
+  it('preserves stable hypothesis refs after compaction removes an earlier rejected hypothesis', () => {
     const input = fixture();
-    const invalidHypothesis = structuredClone(input.output.hypotheses[0]!);
-    invalidHypothesis.supportingSignalIds[0] = '00000000-0000-4000-8000-000000009994';
-    input.output.hypotheses.push(invalidHypothesis);
-    const dependentExperiment = structuredClone(input.output.experiments[0]!);
-    dependentExperiment.hypothesisIndex = 1;
-    input.output.experiments.push(dependentExperiment);
+    const acceptedHypothesis = structuredClone(input.output.hypotheses[0]!);
+    acceptedHypothesis.ref = 'h2';
+    const rejectedHypothesis = structuredClone(input.output.hypotheses[0]!);
+    rejectedHypothesis.ref = 'h1';
+    rejectedHypothesis.supportingSignalIds[0] = '00000000-0000-4000-8000-000000009994';
+    input.output.hypotheses = [rejectedHypothesis, acceptedHypothesis];
+    input.output.experiments[0]!.hypothesisRef = 'h2';
+    input.output.executiveBriefing.supportingHypothesisRefs = ['h2'];
 
     const result = validateIntelligenceSynthesis(input);
 
     expect(result.status).toBe('partial');
-    expect(result.hypotheses.map((item) => item.status)).toEqual(['accepted', 'rejected']);
-    expect(result.experiments.map((item) => item.status)).toEqual(['accepted', 'rejected']);
-    expect(result.experiments[1]!.errors.map((error) => error.code)).toContain(
-      'EXPERIMENT_DEPENDS_ON_INVALID_HYPOTHESIS',
-    );
-    expect(result.acceptedOutput.hypotheses).toEqual([input.output.hypotheses[0]]);
-    expect(result.acceptedOutput.experiments).toEqual([input.output.experiments[0]]);
+    expect(result.hypotheses.map((item) => item.status)).toEqual(['rejected', 'accepted']);
+    expect(result.experiments.map((item) => item.status)).toEqual(['accepted']);
+    expect(result.executiveBriefing.status).toBe('accepted');
+    expect(result.acceptedOutput.hypotheses.map((hypothesis) => hypothesis.ref)).toEqual(['h2']);
+    expect(result.acceptedOutput.experiments.map((experiment) => experiment.hypothesisRef)).toEqual([
+      'h2',
+    ]);
+    expect(result.acceptedOutput.executiveBriefing?.supportingHypothesisRefs).toEqual(['h2']);
   });
 
   it('returns a specific error when the primary metric is also a guardrail', () => {
@@ -426,15 +473,15 @@ describe('validateIntelligenceSynthesis', () => {
     );
   });
 
-  it('rejects an independently unsupported briefing claim', () => {
+  it('rejects an independently unknown briefing hypothesis ref', () => {
     const input = fixture();
-    input.output.executiveBriefing.supportingHypothesisIndexes = [4];
+    input.output.executiveBriefing.supportingHypothesisRefs = ['h5'];
 
     const result = validateIntelligenceSynthesis(input);
 
     expect(result.executiveBriefing.status).toBe('rejected');
     expect(result.executiveBriefing.errors.map((error) => error.code)).toContain(
-      'UNSUPPORTED_BRIEFING_CLAIM',
+      'INVALID_HYPOTHESIS_REFERENCE',
     );
   });
 
@@ -532,6 +579,408 @@ describe('validateIntelligenceSynthesis', () => {
 
     expect(result.hypotheses[0]!.errors.map((error) => error.code)).toContain(
       'EVIDENCE_DEPENDENCY_MISMATCH',
+    );
+  });
+
+  it('grounds numeric content across every experiment prose surface', () => {
+    const input = fixture();
+    const comparisonReference = input.output.hypotheses[0]!.claimReferences.find(
+      (reference) => reference.kind === 'comparison',
+    )!;
+    const ownedReference = { ...comparisonReference, subjectId: BRAND_ID };
+    const experiment = input.output.experiments[0]!;
+    experiment.title = 'Test our $75 free shipping threshold';
+    experiment.objective = 'Measure the impact of retaining our $75 shipping threshold.';
+    experiment.hypothesisUnderTest =
+      'Our $75 shipping threshold may change checkout completion without harming margin.';
+    experiment.variableUnderTest = 'shipping_threshold_75';
+    experiment.design.controlDescription = 'Keep our $75 shipping threshold for the control.';
+    experiment.design.treatmentDescription = 'Change our $75 shipping threshold in treatment.';
+    experiment.implementationNotes = [
+      'Configure the $75 threshold in the control experience.',
+      'Review the $75 threshold before launching the treatment.',
+    ];
+    experiment.caveat.statement = 'Our $75 shipping threshold may affect shipping subsidy costs.';
+    experiment.claimReferences.push(ownedReference);
+    experiment.numericClaims = [
+      {
+        value: 75,
+        unit: 'usd',
+        valueRole: 'owned',
+        reference: ownedReference,
+      },
+    ];
+
+    expect(validateIntelligenceSynthesis(input).experiments[0]).toMatchObject({
+      status: 'accepted',
+      errors: [],
+    });
+  });
+
+  it('rejects an experiment number that is absent from structured numeric claims', () => {
+    const input = fixture();
+    input.output.experiments[0]!.title = 'Test a $35 free shipping threshold';
+
+    const result = validateIntelligenceSynthesis(input);
+
+    expect(result.experiments[0]!.errors.map((error) => error.code)).toContain(
+      'UNSUPPORTED_NUMERIC_CLAIM',
+    );
+  });
+
+  it('rejects an experiment that names a domain outside the exact context', () => {
+    const input = fixture();
+    input.output.experiments[0]!.title = 'Test a threshold used by unknown-rival.test';
+
+    const result = validateIntelligenceSynthesis(input);
+
+    expect(result.experiments[0]!.errors.map((error) => error.code)).toContain(
+      'UNSUPPORTED_EXPERIMENT_CLAIM',
+    );
+  });
+
+  it('rejects an experiment with an invalid structured claim reference', () => {
+    const input = fixture();
+    input.output.experiments[0]!.claimReferences = [
+      {
+        kind: 'signal',
+        signalId: '00000000-0000-4000-8000-000000009993',
+        subjectId: COMPETITOR_ID,
+        assertion: 'fact',
+        claimedEpistemicClass: 'derived',
+      },
+    ];
+
+    const result = validateIntelligenceSynthesis(input);
+
+    expect(result.experiments[0]!.errors.map((error) => error.code)).toContain(
+      'UNKNOWN_SIGNAL_ID',
+    );
+  });
+
+  it.each(['hypotheses', 'experiments'] as const)(
+    'keeps a %s cardinality error global',
+    (section) => {
+    const input = fixture();
+    if (section === 'hypotheses') input.output.hypotheses = [];
+    else input.output.experiments = [];
+
+    const result = validateIntelligenceSynthesis(input);
+    const cardinalityErrors = result.errors.filter(
+      (error) => error.code === 'INVALID_OUTPUT_SCHEMA' && error.path.length === 1,
+    );
+
+    expect(cardinalityErrors.map((error) => error.path)).toEqual([[section]]);
+    },
+  );
+
+  it.each([
+    ['hypotheses', 6],
+    ['experiments', 6],
+  ] as const)('rejects more than five %s without per-item cardinality errors', (section, count) => {
+    const input = fixture();
+    if (section === 'hypotheses') {
+      input.output.hypotheses = Array.from({ length: count }, (_, index) => ({
+        ...structuredClone(input.output.hypotheses[0]!),
+        ref: `h${index + 1}`,
+      }));
+    } else {
+      input.output.experiments = Array.from({ length: count }, () =>
+        structuredClone(input.output.experiments[0]!),
+      );
+    }
+
+    const result = validateIntelligenceSynthesis(input);
+    const cardinalityErrors = result.errors.filter(
+      (error) => error.code === 'INVALID_OUTPUT_SCHEMA' && error.path.length === 1,
+    );
+
+    expect(cardinalityErrors.map((error) => error.path)).toEqual([[section]]);
+  });
+
+  it.each([1, 2, 3, 4, 5])('accepts %i individually grounded hypotheses', (count) => {
+    const input = fixture();
+    input.output.hypotheses = Array.from({ length: count }, (_, index) => ({
+      ...structuredClone(input.output.hypotheses[0]!),
+      ref: `h${index + 1}`,
+    }));
+
+    expect(validateIntelligenceSynthesis(input).errors).toEqual([]);
+  });
+
+  it.each([1, 2, 3, 4, 5])('accepts %i individually grounded experiments', (count) => {
+    const input = fixture();
+    input.output.experiments = Array.from({ length: count }, () =>
+      structuredClone(input.output.experiments[0]!),
+    );
+
+    expect(validateIntelligenceSynthesis(input).errors).toEqual([]);
+  });
+
+  it('rejects prose that attributes an owned numeric claim to the competitor', () => {
+    const input = fixture();
+    const comparisonReference = input.output.hypotheses[0]!.claimReferences.find(
+      (reference) => reference.kind === 'comparison',
+    )!;
+    input.output.hypotheses[0]!.statement = 'rival.test has a $75 free shipping threshold.';
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: 75,
+        unit: 'usd',
+        valueRole: 'owned',
+        reference: { ...comparisonReference, subjectId: BRAND_ID },
+      },
+    ];
+
+    expect(validateIntelligenceSynthesis(input).hypotheses[0]!.errors.map((error) => error.code)).toContain(
+      'UNSUPPORTED_NUMERIC_CLAIM',
+    );
+  });
+
+  it('rejects generic competitor prose backed only by an owned numeric claim', () => {
+    const input = fixture();
+    const comparisonReference = input.output.hypotheses[0]!.claimReferences.find(
+      (reference) => reference.kind === 'comparison',
+    )!;
+    input.output.hypotheses[0]!.statement = 'The competitor has a $75 free shipping threshold.';
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: 75,
+        unit: 'usd',
+        valueRole: 'owned',
+        reference: { ...comparisonReference, subjectId: BRAND_ID },
+      },
+    ];
+
+    expect(validateIntelligenceSynthesis(input).hypotheses[0]!.errors.map((error) => error.code)).toContain(
+      'UNSUPPORTED_NUMERIC_CLAIM',
+    );
+  });
+
+  it('rejects opposite-direction prose for a negative delta', () => {
+    const input = fixture();
+    const comparisonReference = input.output.hypotheses[0]!.claimReferences.find(
+      (reference) => reference.kind === 'comparison',
+    )!;
+    input.output.hypotheses[0]!.statement =
+      'rival.test has a $25 higher free shipping threshold than owned.test.';
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: -25,
+        unit: 'usd',
+        valueRole: 'delta',
+        direction: 'competitor_lower',
+        reference: comparisonReference,
+      },
+    ];
+
+    expect(validateIntelligenceSynthesis(input).hypotheses[0]!.errors.map((error) => error.code)).toContain(
+      'UNSUPPORTED_NUMERIC_CLAIM',
+    );
+  });
+
+  it('rejects percentage prose backed only by a USD claim', () => {
+    const input = fixture();
+    const comparisonReference = input.output.hypotheses[0]!.claimReferences.find(
+      (reference) => reference.kind === 'comparison',
+    )!;
+    input.output.hypotheses[0]!.statement = 'rival.test has a 50% free shipping threshold.';
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: 50,
+        unit: 'usd',
+        valueRole: 'competitor',
+        reference: comparisonReference,
+      },
+    ];
+
+    expect(validateIntelligenceSynthesis(input).hypotheses[0]!.errors.map((error) => error.code)).toContain(
+      'UNSUPPORTED_NUMERIC_CLAIM',
+    );
+  });
+
+  it('requires delta direction in the numeric claim schema', () => {
+    const input = fixture();
+    const comparisonReference = input.output.hypotheses[0]!.claimReferences.find(
+      (reference) => reference.kind === 'comparison',
+    )!;
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: -25,
+        unit: 'usd',
+        valueRole: 'delta',
+        reference: comparisonReference,
+      },
+    ];
+
+    expect(validateIntelligenceSynthesis(input).hypotheses[0]!.errors.map((error) => error.code)).toContain(
+      'INVALID_OUTPUT_SCHEMA',
+    );
+  });
+
+  it('accepts correctly attributed and unit-qualified numeric prose', () => {
+    const input = fixture();
+    const comparisonReference = input.output.hypotheses[0]!.claimReferences.find(
+      (reference) => reference.kind === 'comparison',
+    )!;
+    input.output.hypotheses[0]!.statement = 'rival.test has a $50 free shipping threshold.';
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: 50,
+        unit: 'usd',
+        valueRole: 'competitor',
+        reference: comparisonReference,
+      },
+    ];
+
+    expect(validateIntelligenceSynthesis(input).hypotheses[0]).toMatchObject({
+      status: 'accepted',
+      errors: [],
+    });
+  });
+
+  it.each(['observed', 'reported'] as const)(
+    'handles a %s claim backed by an included untrusted snippet',
+    (claimedEpistemicClass) => {
+      const input = fixture();
+      input.context.untrustedSnippets = [
+        {
+          snippetId: 'snip-1',
+          subjectId: COMPETITOR_ID,
+          subjectRole: 'competitor',
+          sourceUrl: 'https://rival.test/',
+          sourceId: uuid(901),
+          snapshotId: uuid(911),
+          observationId: uuid(1002),
+          field: 'positioning.homepage.headline',
+          text: 'Free delivery on every order.',
+          epistemicClass: 'reported',
+        },
+      ];
+      input.output.hypotheses[0]!.claimReferences.push({
+        kind: 'snippet',
+        snippetId: 'snip-1',
+        subjectId: COMPETITOR_ID,
+        assertion: 'fact',
+        claimedEpistemicClass,
+      });
+      input.output.hypotheses[0]!.epistemicClassDependencies.push('reported');
+
+      const result = validateIntelligenceSynthesis(input);
+
+      if (claimedEpistemicClass === 'observed') {
+        expect(result.hypotheses[0]!.errors.map((error) => error.code)).toContain(
+          'EPISTEMIC_CLASS_VIOLATION',
+        );
+      } else {
+        expect(result.hypotheses[0]).toMatchObject({ status: 'accepted', errors: [] });
+      }
+    },
+  );
+
+  it('rejects duplicate output-local hypothesis refs', () => {
+    const input = fixture();
+    input.output.hypotheses.push(structuredClone(input.output.hypotheses[0]!));
+
+    const result = validateIntelligenceSynthesis(input);
+
+    expect(result.hypotheses.map((item) => item.status)).toEqual(['rejected', 'rejected']);
+    expect(result.hypotheses.flatMap((item) => item.errors).map((error) => error.code)).toContain(
+      'INVALID_HYPOTHESIS_REFERENCE',
+    );
+  });
+
+  it('rejects unknown stable refs from both experiments and briefings', () => {
+    const input = fixture();
+    input.output.experiments[0]!.hypothesisRef = 'h9';
+    input.output.executiveBriefing.supportingHypothesisRefs = ['h9'];
+
+    const result = validateIntelligenceSynthesis(input);
+
+    expect(result.experiments[0]!.errors.map((error) => error.code)).toContain(
+      'INVALID_HYPOTHESIS_REFERENCE',
+    );
+    expect(result.executiveBriefing.errors.map((error) => error.code)).toContain(
+      'INVALID_HYPOTHESIS_REFERENCE',
+    );
+  });
+
+  it('rejects a change-backed claim that selects an unrelated number', () => {
+    const { input, reference } = changeFixture();
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: 11,
+        unit: 'usd',
+        valueRole: 'previous',
+        field: 'threshold',
+        reference,
+      },
+    ];
+
+    expect(validateIntelligenceSynthesis(input).hypotheses[0]!.errors.map((error) => error.code)).toContain(
+      'UNSUPPORTED_NUMERIC_CLAIM',
+    );
+  });
+
+  it.each([
+    ['previous', 75, 'usd', undefined],
+    ['current', 50, 'usd', undefined],
+    ['delta', -25, 'usd', 'decrease'],
+  ] as const)('accepts the exact change %s value', (valueRole, value, unit, direction) => {
+    const { input, reference } = changeFixture();
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value,
+        unit,
+        valueRole,
+        ...(direction ? { direction } : {}),
+        field: 'threshold',
+        reference,
+      },
+    ];
+
+    expect(validateIntelligenceSynthesis(input).hypotheses[0]).toMatchObject({
+      status: 'accepted',
+      errors: [],
+    });
+  });
+
+  it.each([
+    ['delta', -24, 'decrease'],
+    ['delta', -25, 'increase'],
+  ] as const)('rejects an incorrect change %s claim', (valueRole, value, direction) => {
+    const { input, reference } = changeFixture();
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value,
+        unit: 'usd',
+        valueRole,
+        direction,
+        field: 'threshold',
+        reference,
+      },
+    ];
+
+    expect(validateIntelligenceSynthesis(input).hypotheses[0]!.errors.map((error) => error.code)).toContain(
+      value === -24 ? 'UNSUPPORTED_NUMERIC_CLAIM' : 'DELTA_DIRECTION_MISMATCH',
+    );
+  });
+
+  it('rejects a change-backed claim with no resolvable field unit', () => {
+    const { input, reference } = changeFixture();
+    input.context.recentChanges[0]!.factType = 'positioning.homepage';
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: 75,
+        unit: 'usd',
+        valueRole: 'previous',
+        field: 'threshold',
+        reference,
+      },
+    ];
+
+    expect(validateIntelligenceSynthesis(input).hypotheses[0]!.errors.map((error) => error.code)).toContain(
+      'UNSUPPORTED_NUMERIC_CLAIM',
     );
   });
 

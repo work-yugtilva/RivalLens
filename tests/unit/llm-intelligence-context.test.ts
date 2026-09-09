@@ -148,7 +148,7 @@ describe('LLM Intelligence Context & Contracts', () => {
       observationId: uuid(1002),
       field: 'positioning.homepage.headline',
       text: 'Free 2-day delivery on all summer essentials!',
-      epistemicClass: 'observed',
+      epistemicClass: 'reported',
     };
 
     // Default: excluded
@@ -173,7 +173,7 @@ describe('LLM Intelligence Context & Contracts', () => {
       snippetId: 'snip-1',
       subjectRole: 'competitor',
       text: 'Free 2-day delivery on all summer essentials!',
-      epistemicClass: 'observed',
+      epistemicClass: 'reported',
     });
   });
 
@@ -213,7 +213,7 @@ describe('LLM Intelligence Context & Contracts', () => {
         strategicPostureSummary:
           'Rival brand combines a lower shipping threshold with a longer return window.',
         keyTakeaway: 'Immediate risk to top-of-funnel checkout conversion.',
-        supportingHypothesisIndexes: [0],
+        supportingHypothesisRefs: ['h1'],
         claimReferences: [
           {
             kind: 'comparison' as const,
@@ -228,6 +228,7 @@ describe('LLM Intelligence Context & Contracts', () => {
       },
       hypotheses: [
         {
+          ref: 'h1',
           competitorId: COMPETITOR_ID,
           theme: 'shipping_friction',
           statement:
@@ -279,7 +280,7 @@ describe('LLM Intelligence Context & Contracts', () => {
       experiments: [
         {
           competitorId: COMPETITOR_ID,
-          hypothesisIndex: 0,
+          hypothesisRef: 'h1',
           title: 'Test lowering free shipping threshold to $55',
           objective: 'Evaluate conversion lift vs shipping margin subsidy.',
           hypothesisUnderTest: 'A lower shipping threshold will increase checkout completion rate.',
@@ -303,6 +304,17 @@ describe('LLM Intelligence Context & Contracts', () => {
             category: 'shipping_margin_exposure' as const,
             statement: 'Subsidizing shipping without higher AOV degrades margin.',
           },
+          claimReferences: [
+            {
+              kind: 'comparison' as const,
+              comparisonKey: 'offer.free_shipping_threshold',
+              competitorId: COMPETITOR_ID,
+              subjectId: COMPETITOR_ID,
+              assertion: 'fact' as const,
+              claimedEpistemicClass: 'observed' as const,
+            },
+          ],
+          numericClaims: [],
         },
       ],
     };
