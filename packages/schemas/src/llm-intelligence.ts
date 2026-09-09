@@ -161,7 +161,21 @@ export const intelligenceContextSchema = z
         (competitors) => competitors.every((c, i) => i === 0 || competitors[i - 1]!.id < c.id),
         'Competitors must be unique and sorted by ID',
       ),
-    facts: z.array(contextComparisonFactSchema),
+    facts: z.array(contextComparisonFactSchema).superRefine((facts, context) => {
+      const keysByCompetitor = new Map<string, Set<string>>();
+      for (const [index, fact] of facts.entries()) {
+        const keys = keysByCompetitor.get(fact.competitor.subjectId) ?? new Set<string>();
+        if (keys.has(fact.key)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [index],
+            message: 'Comparison facts must be unique per competitor and key',
+          });
+        }
+        keys.add(fact.key);
+        keysByCompetitor.set(fact.competitor.subjectId, keys);
+      }
+    }),
     signals: z
       .array(contextSignalSchema)
       .refine((signals) => new Set(signals.map((signal) => signal.id)).size === signals.length, {

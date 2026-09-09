@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import {
   DEFAULT_INTELLIGENCE_CONTEXT_LIMITS,
@@ -29,6 +30,16 @@ export type BuildIntelligenceContextInput = {
 
 function compareStrings(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function comparisonFactEpistemicClass(
+  values: Array<{ state: 'present' | 'explicitly_absent' | 'unknown'; provenance: unknown } | undefined>,
+): 'observed' | 'derived' {
+  return values.every(
+    (value) => value === undefined || value.state === 'unknown' || value.provenance != null,
+  )
+    ? 'observed'
+    : 'derived';
 }
 
 export function canonicalContext(value: unknown): string {
@@ -91,7 +102,7 @@ export function buildIntelligenceContext(input: BuildIntelligenceContextInput): 
 
       facts.push({
         key: fact.key,
-        epistemicClass: 'observed',
+        epistemicClass: comparisonFactEpistemicClass([ownedValue, competitorValue]),
         owned: {
           subjectId: brand.id,
           subjectRole: 'owned',
@@ -265,9 +276,10 @@ export function buildIntelligenceContext(input: BuildIntelligenceContextInput): 
   const parsedContext = intelligenceContextSchema.parse(contextCandidate);
 
   const serialized = canonicalContext(parsedContext);
-  if (serialized.length > limits.maxSerializedBytes) {
+  const serializedBytes = Buffer.byteLength(serialized, 'utf8');
+  if (serializedBytes > limits.maxSerializedBytes) {
     throw new Error(
-      `IntelligenceContext exceeds maximum serialized byte limit: ${serialized.length} > ${limits.maxSerializedBytes}`,
+      `IntelligenceContext exceeds maximum serialized byte limit: ${serializedBytes} > ${limits.maxSerializedBytes}`,
     );
   }
 

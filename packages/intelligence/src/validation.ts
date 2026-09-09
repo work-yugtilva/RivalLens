@@ -81,7 +81,7 @@ export type ValidateIntelligenceSynthesisInput = {
 type ContextIndexes = {
   context: IntelligenceContext;
   competitorIds: Set<string>;
-  factsByIdentity: Map<string, ContextComparisonFact>;
+  factsByCompetitor: Map<string, Map<string, ContextComparisonFact>>;
   comparisonKeysByCompetitor: Map<string, Set<string>>;
   signalsById: Map<string, ContextSignal>;
   observationsById: Map<string, Set<string>>;
@@ -116,8 +116,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function factIdentity(competitorId: string, comparisonKey: string): string {
-  return `${competitorId}\u0000${comparisonKey}`;
+function signalEvidenceSubjectId(
+  role: ContextSignal['evidence'][number]['role'],
+  signal: ContextSignal,
+  context: IntelligenceContext,
+): string {
+  switch (role) {
+    case 'owned':
+      return context.brand.id;
+    case 'competitor':
+    case 'previous':
+    case 'current':
+    case 'evaluation':
+    case 'previous_evaluation':
+      return signal.competitorId;
+  }
+
+  const unhandledRole: never = role;
+  throw new Error(`Unsupported signal evidence role: ${unhandledRole}`);
 }
 
 function addObservation(
@@ -132,12 +148,14 @@ function addObservation(
 }
 
 function buildIndexes(context: IntelligenceContext): ContextIndexes {
-  const factsByIdentity = new Map<string, ContextComparisonFact>();
+  const factsByCompetitor = new Map<string, Map<string, ContextComparisonFact>>();
   const comparisonKeysByCompetitor = new Map<string, Set<string>>();
   const observationsById = new Map<string, Set<string>>();
   for (const fact of context.facts) {
     const competitorId = fact.competitor.subjectId;
-    factsByIdentity.set(factIdentity(competitorId, fact.key), fact);
+    const factsByKey = factsByCompetitor.get(competitorId) ?? new Map<string, ContextComparisonFact>();
+    factsByKey.set(fact.key, fact);
+    factsByCompetitor.set(competitorId, factsByKey);
     const keys = comparisonKeysByCompetitor.get(competitorId) ?? new Set<string>();
     keys.add(fact.key);
     comparisonKeysByCompetitor.set(competitorId, keys);
@@ -165,7 +183,7 @@ function buildIndexes(context: IntelligenceContext): ContextIndexes {
     keys.add(signal.comparisonKey);
     comparisonKeysByCompetitor.set(signal.competitorId, keys);
     for (const evidence of signal.evidence) {
-      const subjectId = evidence.role === 'owned' ? context.brand.id : signal.competitorId;
+      const subjectId = signalEvidenceSubjectId(evidence.role, signal, context);
       addObservation(observationsById, evidence.observationId, subjectId);
       addObservation(observationsById, evidence.priorObservationId, subjectId);
     }
@@ -181,7 +199,7 @@ function buildIndexes(context: IntelligenceContext): ContextIndexes {
   return {
     context,
     competitorIds: new Set(context.competitors.map((competitor) => competitor.id)),
-    factsByIdentity,
+    factsByCompetitor,
     comparisonKeysByCompetitor,
     signalsById,
     observationsById,
@@ -212,9 +230,9 @@ function resolveReference(
           ),
         );
       }
-      const fact = indexes.factsByIdentity.get(
-        factIdentity(reference.competitorId, reference.comparisonKey),
-      );
+      const fact = indexes.factsByCompetitor
+        .get(reference.competitorId)
+        ?.get(reference.comparisonKey);
       if (!fact) {
         errors.push(
           validationError(
@@ -531,9 +549,15 @@ function validateNumericClaim(
   return errors;
 }
 
-const CERTAINTY_PATTERN = /\b(?:will|guarantees?|proves?|causes?|certainly|definitely|always)\b/i;
-const NUMBER_PATTERN = /\$?([-+]?\d+(?:\.\d+)?)(?:\s*(percentage points|%|percent|days|usd))?/gi;
+const CERTAINTY_PATTERN =
+  /\b(?:will|guaranteed|guarantees|proven|proves?|caused|causes?|ensures?|drives?|leads to|results in|clearly|undoubtedly|certainly|definitely|always)\b/i;
+const NUMBER_PATTERN =
+  /(?<![\w.])(\$?)([-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:e[-+]?\d+)?)(?:\s*(percentage points|%|percent|days|usd))?/gi;
 const DOMAIN_PATTERN = /\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b/gi;
+
+function hasUnsupportedCausalCertainty(texts: string[]): boolean {
+  return CERTAINTY_PATTERN.test(texts.join(' '));
+}
 
 function sentenceAt(text: string, index: number): string {
   let start = 0;
@@ -559,6 +583,18 @@ function proseUnit(value: string): GroundedNumericClaim['unit'] | undefined {
   if (/\bdays?\b/.test(normalized)) return 'days';
   if (normalized.includes('$') || /\busd\b/.test(normalized)) return 'usd';
   return undefined;
+}
+
+function isHarmlessBareNumber(match: RegExpMatchArray, text: string): boolean {
+  const currency = match[1] ?? '';
+  const rawValue = match[2] ?? '';
+  const unit = match[3] ?? '';
+  if (currency || unit || /[+\-.,e]/i.test(rawValue)) return false;
+  const value = Number(rawValue);
+  if (Number.isInteger(value) && value >= 1900 && value <= 2100) return true;
+
+  const prefix = text.slice(0, match.index ?? 0);
+  return /[a-z]+[A-Z][A-Za-z0-9-]*\s*$/.test(prefix);
 }
 
 function proseDirection(
@@ -641,7 +677,8 @@ function unsupportedProseNumberErrors(
   const errors: IntelligenceValidationError[] = [];
   for (const text of texts) {
     for (const match of text.matchAll(NUMBER_PATTERN)) {
-      const value = Number(match[1]);
+      if (isHarmlessBareNumber(match, text)) continue;
+      const value = Number((match[2] ?? '').replaceAll(',', ''));
       const sentence = sentenceAt(text, match.index ?? 0);
       const unit = proseUnit(match[0]);
       const subjects = mentionedSubjectIds(sentence, indexes);
@@ -827,7 +864,7 @@ function validateHypothesis(
       [...path, 'prose'],
     ),
   );
-  if (CERTAINTY_PATTERN.test(`${hypothesis.statement} ${hypothesis.rationale}`)) {
+  if (hasUnsupportedCausalCertainty(texts)) {
     errors.push(
       validationError(
         'UNSUPPORTED_CAUSAL_CLAIM',
@@ -948,7 +985,7 @@ function validateExperiment(
     ...experiment.implementationNotes,
     experiment.caveat.statement,
   ];
-  if (CERTAINTY_PATTERN.test(texts.join(' '))) {
+  if (hasUnsupportedCausalCertainty(texts)) {
     errors.push(
       validationError(
         'EXPERIMENT_NOT_FRAMED_AS_TEST',
@@ -1094,7 +1131,7 @@ function validateBriefing(
     'prose',
   ]);
   errors.push(...numericErrors);
-  if (numericErrors.length > 0 || CERTAINTY_PATTERN.test(texts.join(' '))) {
+  if (numericErrors.length > 0 || hasUnsupportedCausalCertainty(texts)) {
     errors.push(
       validationError(
         'UNSUPPORTED_BRIEFING_CLAIM',

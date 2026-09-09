@@ -420,6 +420,50 @@ describe('validateIntelligenceSynthesis', () => {
     );
   });
 
+  it('rejects an observed claim backed by a fact with null provenance', () => {
+    const input = fixture();
+    input.context.facts[0]!.competitor.provenance = null;
+    input.context.facts[0]!.epistemicClass = 'derived';
+
+    const result = validateIntelligenceSynthesis(input);
+
+    expect(result.hypotheses[0]!.errors.map((error) => error.code)).toContain(
+      'EPISTEMIC_CLASS_VIOLATION',
+    );
+  });
+
+  it.each([
+    ['owned', BRAND_ID],
+    ['competitor', COMPETITOR_ID],
+    ['previous', COMPETITOR_ID],
+    ['current', COMPETITOR_ID],
+    ['evaluation', COMPETITOR_ID],
+    ['previous_evaluation', COMPETITOR_ID],
+  ] as const)('attributes %s signal evidence to its supported subject', (role, subjectId) => {
+    const input = fixture();
+    const signal = input.context.signals[0]!;
+    const observationId = uuid(3000 + input.context.signals.length);
+    signal.evidence = [
+      {
+        ...signal.evidence[0]!,
+        role,
+        observationId,
+      },
+    ];
+    input.output.hypotheses[0]!.claimReferences.push({
+      kind: 'observation',
+      observationId,
+      subjectId,
+      assertion: 'fact',
+      claimedEpistemicClass: 'observed',
+    });
+
+    expect(validateIntelligenceSynthesis(input).hypotheses[0]).toMatchObject({
+      status: 'accepted',
+      errors: [],
+    });
+  });
+
   it('rejects treating unknown comparison state as explicit absence', () => {
     const input = fixture();
     input.context.facts[0]!.competitor.state = 'unknown';
@@ -497,6 +541,103 @@ describe('validateIntelligenceSynthesis', () => {
     );
   });
 
+  it('treats a thousands-separated currency amount as one unsupported commercial claim', () => {
+    const input = fixture();
+    input.output.hypotheses[0]!.statement =
+      'The competitor appears to offer a $1,200 free shipping threshold.';
+
+    const result = validateIntelligenceSynthesis(input);
+
+    expect(result.hypotheses[0]!.errors).toContainEqual(
+      expect.objectContaining({
+        code: 'UNSUPPORTED_NUMERIC_CLAIM',
+        message: 'Prose number 1200 has no matching structured numeric claim',
+      }),
+    );
+  });
+
+  it('accepts a grounded decimal currency amount', () => {
+    const input = fixture();
+    const comparisonReference = input.output.hypotheses[0]!.claimReferences.find(
+      (reference) => reference.kind === 'comparison',
+    )!;
+    input.output.hypotheses[0]!.statement =
+      'rival.test appears to offer a $50.00 free shipping threshold.';
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: 50,
+        unit: 'usd',
+        valueRole: 'competitor',
+        reference: comparisonReference,
+      },
+    ];
+
+    expect(validateIntelligenceSynthesis(input).hypotheses[0]).toMatchObject({
+      status: 'accepted',
+      errors: [],
+    });
+  });
+
+  it('normalizes scientific notation before rejecting an unsupported commercial amount', () => {
+    const input = fixture();
+    input.output.hypotheses[0]!.statement =
+      'The competitor appears to offer a 1e3 usd free shipping threshold.';
+
+    expect(validateIntelligenceSynthesis(input).hypotheses[0]!.errors).toContainEqual(
+      expect.objectContaining({
+        code: 'UNSUPPORTED_NUMERIC_CLAIM',
+        message: 'Prose number 1000 has no matching structured numeric claim',
+      }),
+    );
+  });
+
+  it('checks both endpoints of an unsupported numeric range', () => {
+    const input = fixture();
+    input.output.hypotheses[0]!.assumptions = [
+      'The pilot could run for 3-5 days before interpreting results.',
+    ];
+
+    const messages = validateIntelligenceSynthesis(input).hypotheses[0]!.errors.map(
+      (error) => error.message,
+    );
+    expect(messages).toContain('Prose number 3 has no matching structured numeric claim');
+    expect(messages).toContain('Prose number 5 has no matching structured numeric claim');
+  });
+
+  it('accepts a grounded signed numeric delta', () => {
+    const input = fixture();
+    const comparisonReference = input.output.hypotheses[0]!.claimReferences.find(
+      (reference) => reference.kind === 'comparison',
+    )!;
+    input.output.hypotheses[0]!.statement =
+      'rival.test appears to have a -25 usd lower free shipping threshold.';
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: -25,
+        unit: 'usd',
+        valueRole: 'delta',
+        direction: 'competitor_lower',
+        reference: comparisonReference,
+      },
+    ];
+
+    expect(validateIntelligenceSynthesis(input).hypotheses[0]).toMatchObject({
+      status: 'accepted',
+      errors: [],
+    });
+  });
+
+  it('ignores bare calendar years and camel-case product model labels', () => {
+    const input = fixture();
+    input.output.hypotheses[0]!.statement =
+      'The 2025 iPhone 15 example may be worth testing as generic copy.';
+
+    expect(validateIntelligenceSynthesis(input).hypotheses[0]).toMatchObject({
+      status: 'accepted',
+      errors: [],
+    });
+  });
+
   it('rejects causal certainty in a hypothesis', () => {
     const input = fixture();
     input.output.hypotheses[0]!.statement =
@@ -509,6 +650,44 @@ describe('validateIntelligenceSynthesis', () => {
     );
   });
 
+  it('rejects certainty introduced through a hypothesis uncertainty statement', () => {
+    const input = fixture();
+    input.output.hypotheses[0]!.uncertainty.statement =
+      'The available evidence clearly guarantees the customer outcome.';
+
+    const result = validateIntelligenceSynthesis(input);
+
+    expect(result.hypotheses[0]!.errors.map((error) => error.code)).toContain(
+      'UNSUPPORTED_CAUSAL_CLAIM',
+    );
+  });
+
+  it.each([
+    ['statement', (input: ReturnType<typeof fixture>) => {
+      input.output.hypotheses[0]!.statement = 'The competitor clearly drives a guaranteed outcome.';
+    }],
+    ['rationale', (input: ReturnType<typeof fixture>) => {
+      input.output.hypotheses[0]!.rationale =
+        'The observed policy results in a proven customer outcome for this competitor.';
+    }],
+    ['uncertainty statement', (input: ReturnType<typeof fixture>) => {
+      input.output.hypotheses[0]!.uncertainty.statement =
+        'The policy undoubtedly causes the expected customer outcome.';
+    }],
+    ['assumption', (input: ReturnType<typeof fixture>) => {
+      input.output.hypotheses[0]!.assumptions = [
+        'The policy ensures that the commercial outcome occurs.',
+      ];
+    }],
+  ])('rejects unsupported certainty in hypothesis %s prose', (_surface, apply) => {
+    const input = fixture();
+    apply(input);
+
+    expect(validateIntelligenceSynthesis(input).hypotheses[0]!.errors.map((error) => error.code)).toContain(
+      'UNSUPPORTED_CAUSAL_CLAIM',
+    );
+  });
+
   it('rejects an experiment framed as a promised result', () => {
     const input = fixture();
     input.output.experiments[0]!.hypothesisUnderTest =
@@ -517,6 +696,43 @@ describe('validateIntelligenceSynthesis', () => {
     const result = validateIntelligenceSynthesis(input);
 
     expect(result.experiments[0]!.errors.map((error) => error.code)).toContain(
+      'EXPERIMENT_NOT_FRAMED_AS_TEST',
+    );
+  });
+
+  it.each([
+    ['title', (input: ReturnType<typeof fixture>) => {
+      input.output.experiments[0]!.title = 'Test a policy that clearly drives conversion';
+    }],
+    ['objective', (input: ReturnType<typeof fixture>) => {
+      input.output.experiments[0]!.objective =
+        'Measure whether the policy leads to a guaranteed customer outcome.';
+    }],
+    ['hypothesis under test', (input: ReturnType<typeof fixture>) => {
+      input.output.experiments[0]!.hypothesisUnderTest =
+        'The treatment ensures the result is proven for customers.';
+    }],
+    ['control description', (input: ReturnType<typeof fixture>) => {
+      input.output.experiments[0]!.design.controlDescription =
+        'Keep the policy that results in the current customer outcome.';
+    }],
+    ['treatment description', (input: ReturnType<typeof fixture>) => {
+      input.output.experiments[0]!.design.treatmentDescription =
+        'Show the treatment that undoubtedly causes a commercial outcome.';
+    }],
+    ['implementation note', (input: ReturnType<typeof fixture>) => {
+      input.output.experiments[0]!.implementationNotes[0] =
+        'Configure the policy that guarantees the customer outcome.';
+    }],
+    ['caveat statement', (input: ReturnType<typeof fixture>) => {
+      input.output.experiments[0]!.caveat.statement =
+        'The policy caused a certain customer outcome in this experiment.';
+    }],
+  ])('rejects unsupported certainty in experiment %s prose', (_surface, apply) => {
+    const input = fixture();
+    apply(input);
+
+    expect(validateIntelligenceSynthesis(input).experiments[0]!.errors.map((error) => error.code)).toContain(
       'EXPERIMENT_NOT_FRAMED_AS_TEST',
     );
   });
@@ -556,6 +772,43 @@ describe('validateIntelligenceSynthesis', () => {
     );
   });
 
+  it.each([
+    ['headline', (input: ReturnType<typeof fixture>) => {
+      input.output.executiveBriefing.headline = 'Policy clearly drives a commercial outcome';
+    }],
+    ['strategic posture summary', (input: ReturnType<typeof fixture>) => {
+      input.output.executiveBriefing.strategicPostureSummary =
+        'The policy ensures the result is proven for this market.';
+    }],
+    ['key takeaway', (input: ReturnType<typeof fixture>) => {
+      input.output.executiveBriefing.keyTakeaway =
+        'The policy undoubtedly leads to a guaranteed commercial result.';
+    }],
+  ])('rejects unsupported certainty in briefing %s prose', (_surface, apply) => {
+    const input = fixture();
+    apply(input);
+
+    expect(validateIntelligenceSynthesis(input).executiveBriefing.errors.map((error) => error.code)).toContain(
+      'UNSUPPORTED_BRIEFING_CLAIM',
+    );
+  });
+
+  it('accepts ordinary uncertain hypothesis language', () => {
+    const input = fixture();
+    input.output.hypotheses[0]!.statement =
+      'The competitor may be using shipping policy to reduce purchase friction.';
+    input.output.hypotheses[0]!.rationale =
+      'The evidence could suggest a pattern that appears worth testing.';
+    input.output.hypotheses[0]!.uncertainty.statement =
+      'The available evidence suggests the effect remains uncertain.';
+    input.output.hypotheses[0]!.assumptions = ['This pattern may be worth testing with customers.'];
+
+    expect(validateIntelligenceSynthesis(input).hypotheses[0]).toMatchObject({
+      status: 'accepted',
+      errors: [],
+    });
+  });
+
   it('rejects a briefing that introduces a competitor outside the context', () => {
     const input = fixture();
     input.output.executiveBriefing.strategicPostureSummary =
@@ -566,6 +819,41 @@ describe('validateIntelligenceSynthesis', () => {
     expect(result.executiveBriefing.errors.map((error) => error.code)).toContain(
       'UNSUPPORTED_BRIEFING_CLAIM',
     );
+  });
+
+  it.each([
+    ['hypothesis', (input: ReturnType<typeof fixture>) => {
+      input.output.hypotheses[0]!.statement =
+        'unknown-rival.test may be using shipping policy to reduce purchase friction.';
+    }, 'EVIDENCE_DEPENDENCY_MISMATCH'],
+    ['experiment', (input: ReturnType<typeof fixture>) => {
+      input.output.experiments[0]!.title = 'Test a threshold used by unknown-rival.test';
+    }, 'UNSUPPORTED_EXPERIMENT_CLAIM'],
+    ['briefing', (input: ReturnType<typeof fixture>) => {
+      input.output.executiveBriefing.headline =
+        'unknown-rival.test may be reducing purchase friction';
+    }, 'UNSUPPORTED_BRIEFING_CLAIM'],
+  ])('rejects an out-of-context domain in %s prose', (_surface, apply, expectedCode) => {
+    const input = fixture();
+    apply(input);
+    const result = validateIntelligenceSynthesis(input);
+    const errors = [
+      ...result.hypotheses.flatMap((hypothesis) => hypothesis.errors),
+      ...result.experiments.flatMap((experiment) => experiment.errors),
+      ...result.executiveBriefing.errors,
+    ];
+
+    expect(errors.map((error) => error.code)).toContain(expectedCode);
+  });
+
+  it('accepts owned and known competitor domains in model prose', () => {
+    const input = fixture();
+    input.output.hypotheses[0]!.statement =
+      'rival.test may use shipping policy differently from owned.test.';
+    input.output.experiments[0]!.title = 'Test a response to rival.test shipping policy';
+    input.output.executiveBriefing.headline = 'rival.test may differ from owned.test on shipping';
+
+    expect(validateIntelligenceSynthesis(input).errors).toEqual([]);
   });
 
   it('requires declared claim references to cover every listed evidence dependency', () => {

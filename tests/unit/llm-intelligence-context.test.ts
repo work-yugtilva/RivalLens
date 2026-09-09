@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { Buffer } from 'node:buffer';
 import {
   buildIntelligenceContext,
   canonicalContext,
@@ -250,6 +251,58 @@ describe('LLM Intelligence Context & Contracts', () => {
     ).toThrow(/Snippet IDs must be unique/);
   });
 
+  it('rejects duplicate semantic fact identities without restricting distinct comparison keys', () => {
+    const context = buildIntelligenceContext({
+      comparison: sampleInput.comparison,
+      signals: sampleInput.currentSignals,
+      generatedAt: GENERATED_AT,
+    });
+    const duplicateFact = structuredClone(context.facts[0]!);
+    const distinctFact = { ...structuredClone(duplicateFact), key: 'offer.promo:SAVE20' };
+    const secondCompetitorId = '33333333-3333-4333-8333-333333333333';
+    const distinctCompetitorFact = {
+      ...structuredClone(duplicateFact),
+      competitor: {
+        ...duplicateFact.competitor,
+        subjectId: secondCompetitorId,
+        domain: 'second-rival.test',
+      },
+    };
+
+    expect(() =>
+      intelligenceContextSchema.parse({ ...context, facts: [...context.facts, duplicateFact] }),
+    ).toThrow(/Comparison facts must be unique per competitor and key/);
+    expect(() =>
+      intelligenceContextSchema.parse({ ...context, facts: [...context.facts, distinctFact] }),
+    ).not.toThrow();
+    expect(() =>
+      intelligenceContextSchema.parse({
+        ...context,
+        competitors: [
+          ...context.competitors,
+          { id: secondCompetitorId, domain: 'second-rival.test' },
+        ],
+        facts: [...context.facts, distinctCompetitorFact],
+      }),
+    ).not.toThrow();
+  });
+
+  it('classifies a present fact without provenance as derived', () => {
+    const comparison = structuredClone(sampleInput.comparison);
+    const fact = comparison.facts.find((candidate) => candidate.key === 'offer.free_shipping_threshold')!;
+    fact.valuesBySubjectId[COMPETITOR_ID]!.provenance = null;
+
+    const context = buildIntelligenceContext({
+      comparison,
+      signals: sampleInput.currentSignals,
+      generatedAt: GENERATED_AT,
+    });
+
+    expect(
+      context.facts.find((candidate) => candidate.key === 'offer.free_shipping_threshold')?.epistemicClass,
+    ).toBe('derived');
+  });
+
   it('enforces maximum serialized byte budget', () => {
     expect(() =>
       buildIntelligenceContext({
@@ -259,6 +312,30 @@ describe('LLM Intelligence Context & Contracts', () => {
         limits: {
           maxSerializedBytes: 50, // Tiny budget to trigger error
         },
+      }),
+    ).toThrow(/exceeds maximum serialized byte limit/);
+  });
+
+  it('measures the serialized budget in UTF-8 bytes rather than UTF-16 code units', () => {
+    const signals = sampleInput.currentSignals.map((signal) => ({
+      ...signal,
+      statement: `${signal.statement} ${'海'.repeat(100)}`,
+    }));
+    const unboundedContext = buildIntelligenceContext({
+      comparison: sampleInput.comparison,
+      signals,
+      generatedAt: GENERATED_AT,
+      limits: { maxSerializedBytes: 100_000 },
+    });
+    const serialized = canonicalContext(unboundedContext);
+
+    expect(Buffer.byteLength(serialized, 'utf8')).toBeGreaterThan(serialized.length);
+    expect(() =>
+      buildIntelligenceContext({
+        comparison: sampleInput.comparison,
+        signals,
+        generatedAt: GENERATED_AT,
+        limits: { maxSerializedBytes: serialized.length },
       }),
     ).toThrow(/exceeds maximum serialized byte limit/);
   });

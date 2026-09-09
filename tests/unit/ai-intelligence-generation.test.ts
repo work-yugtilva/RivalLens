@@ -193,12 +193,76 @@ describe('generateIntelligence', () => {
     expect(result).toMatchObject({ kind: 'context_failure', code: 'CONTEXT_HASH_MISMATCH' });
   });
 
+  it('fails before generation when generatedAt changes after context hashing', async () => {
+    const context = fixture();
+    const contextHash = intelligenceContextHash(context);
+    context.generatedAt = '2025-02-01T00:00:00.000Z';
+
+    const result = record(await generate('provider_exception', context, contextHash));
+
+    expect(result).toMatchObject({ kind: 'context_failure', code: 'CONTEXT_HASH_MISMATCH' });
+  });
+
+  it('supplies the provider with a recursively frozen validation snapshot', async () => {
+    const api = ai as unknown as {
+      DeterministicMockIntelligenceProvider: new (scenario: string) => {
+        generateStructured: (request: unknown) => Promise<unknown>;
+      };
+      generateIntelligence: (input: {
+        context: IntelligenceContext;
+        contextHash: string;
+        provider: unknown;
+        promptVersion: string;
+        systemPrompt: string;
+      }) => Promise<unknown>;
+    };
+    const context = fixture();
+    const fallback = new api.DeterministicMockIntelligenceProvider('valid');
+    let providerContext: unknown;
+    const provider = {
+      providerId: 'recording-provider',
+      modelId: 'recording-model',
+      async generateStructured(request: unknown) {
+        providerContext = record(request).context;
+        return fallback.generateStructured(request);
+      },
+    };
+
+    const result = record(
+      await api.generateIntelligence({
+        context,
+        contextHash: intelligenceContextHash(context),
+        provider,
+        promptVersion: 'phase-3b-test',
+        systemPrompt: 'Return the requested structured intelligence synthesis.',
+      }),
+    );
+
+    expect(result).toMatchObject({ kind: 'validated' });
+    expect(providerContext).not.toBe(context);
+    expect(Object.isFrozen(providerContext)).toBe(true);
+    expect(Object.isFrozen(record(providerContext).facts)).toBe(true);
+    expect(Object.isFrozen((record(providerContext).facts as unknown[])[0])).toBe(true);
+  });
+
   it('fails closed when a supplied context duplicates a signal ID', async () => {
     const context = fixture();
     const duplicateContext = {
       ...context,
       signals: [...context.signals, context.signals[0]!],
     } as IntelligenceContext;
+    const result = record(await generate('provider_exception', duplicateContext));
+
+    expect(result).toMatchObject({ kind: 'context_failure', code: 'INVALID_CONTEXT' });
+  });
+
+  it('fails closed when a supplied context duplicates a semantic fact identity', async () => {
+    const context = fixture();
+    const duplicateContext = {
+      ...context,
+      facts: [...context.facts, structuredClone(context.facts[0]!)],
+    } as IntelligenceContext;
+
     const result = record(await generate('provider_exception', duplicateContext));
 
     expect(result).toMatchObject({ kind: 'context_failure', code: 'INVALID_CONTEXT' });
