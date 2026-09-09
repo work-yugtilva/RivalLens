@@ -1,8 +1,19 @@
-import type { z } from 'zod';
-
-export interface StructuredAiProvider {
-  generate<TSchema extends z.ZodType>(input: {
-    schema: TSchema;
-    promptVersion: string;
-  }): Promise<z.infer<TSchema>>;
-}
+export {
+  generateIntelligence,
+  type GenerateIntelligenceInput,
+  type GenerateIntelligenceResult,
+} from './generation';
+export {
+  DeterministicMockIntelligenceProvider,
+  type DeterministicMockScenario,
+} from './mock-provider';
+export {
+  IntelligenceProviderError,
+  type DeepReadonly,
+  type IntelligenceModelParameters,
+  type IntelligenceModelProvider,
+  type IntelligenceProviderErrorCode,
+  type IntelligenceRequest,
+  type IntelligenceResponse,
+  type IntelligenceResponseTelemetry,
+} from './provider';

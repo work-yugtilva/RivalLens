@@ -162,9 +162,23 @@ export const intelligenceContextSchema = z
         'Competitors must be unique and sorted by ID',
       ),
     facts: z.array(contextComparisonFactSchema),
-    signals: z.array(contextSignalSchema),
-    recentChanges: z.array(contextObservedChangeSchema),
-    untrustedSnippets: z.array(contextUntrustedSnippetSchema),
+    signals: z
+      .array(contextSignalSchema)
+      .refine((signals) => new Set(signals.map((signal) => signal.id)).size === signals.length, {
+        message: 'Signal IDs must be unique',
+      }),
+    recentChanges: z
+      .array(contextObservedChangeSchema)
+      .refine(
+        (changes) => new Set(changes.map((change) => change.id)).size === changes.length,
+        { message: 'Observed change IDs must be unique' },
+      ),
+    untrustedSnippets: z
+      .array(contextUntrustedSnippetSchema)
+      .refine(
+        (snippets) => new Set(snippets.map((snippet) => snippet.snippetId)).size === snippets.length,
+        { message: 'Snippet IDs must be unique' },
+      ),
     analysisObjective: analysisObjectiveSchema,
     generatedAt: timestamp,
     limits: intelligenceContextLimitsSchema,

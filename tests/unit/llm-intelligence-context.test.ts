@@ -193,6 +193,63 @@ describe('LLM Intelligence Context & Contracts', () => {
     expect(context.signals.length).toBe(1);
   });
 
+  it('rejects duplicate entity IDs in a supplied intelligence context', () => {
+    const context = buildIntelligenceContext({
+      comparison: sampleInput.comparison,
+      signals: sampleInput.currentSignals,
+      generatedAt: GENERATED_AT,
+    });
+    const change = {
+      id: uuid(701),
+      subjectId: COMPETITOR_ID,
+      subjectRole: 'competitor' as const,
+      factType: 'offer.free_shipping',
+      changeType: 'offer.free_shipping.threshold_changed' as const,
+      detectedAt: GENERATED_AT,
+      beforeValue: { threshold: 75 },
+      afterValue: { threshold: 50 },
+      epistemicClass: 'derived' as const,
+      evidence: {
+        sourceId: uuid(901),
+        currentSnapshotId: uuid(911),
+        previousSnapshotId: uuid(910),
+        currentObservationId: uuid(1002),
+        previousObservationId: uuid(1001),
+      },
+    };
+    const snippet: ContextUntrustedSnippet = {
+      snippetId: 'snip-duplicate',
+      subjectId: COMPETITOR_ID,
+      subjectRole: 'competitor',
+      sourceUrl: 'https://rival.test/',
+      sourceId: uuid(901),
+      snapshotId: uuid(911),
+      observationId: uuid(1002),
+      field: 'positioning.homepage.headline',
+      text: 'Free 2-day delivery on all summer essentials!',
+      epistemicClass: 'reported',
+    };
+
+    expect(() =>
+      intelligenceContextSchema.parse({
+        ...context,
+        signals: [...context.signals, context.signals[0]],
+      }),
+    ).toThrow(/Signal IDs must be unique/);
+    expect(() =>
+      intelligenceContextSchema.parse({
+        ...context,
+        recentChanges: [change, change],
+      }),
+    ).toThrow(/Observed change IDs must be unique/);
+    expect(() =>
+      intelligenceContextSchema.parse({
+        ...context,
+        untrustedSnippets: [snippet, snippet],
+      }),
+    ).toThrow(/Snippet IDs must be unique/);
+  });
+
   it('enforces maximum serialized byte budget', () => {
     expect(() =>
       buildIntelligenceContext({
