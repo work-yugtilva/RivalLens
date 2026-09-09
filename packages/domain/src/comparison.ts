@@ -1,6 +1,7 @@
 import { brandComparisonRequestSchema } from '@rivallens/schemas';
 
 import {
+  hostAuthorityRank,
   mergeSubjectCurrentState,
   resolveSubjectProductFacts,
   type FactProvenance,
@@ -188,8 +189,9 @@ function bindingsForIdentity(factIdentity: string): ComparisonKeyBinding[] {
     return [{ key: 'offer.free_shipping_threshold', resolve: freeShippingThresholdValue }];
   }
   if (factIdentity.startsWith('offer:discount:')) {
-    const suffix = factIdentity.slice('offer:discount:'.length);
-    return [{ key: `offer.discount:${suffix}`, resolve: resolvedToSubjectValue }];
+    const parts = factIdentity.slice('offer:discount:'.length).split(':');
+    const type = parts[0];
+    return [{ key: `offer.discount:${type}`, resolve: resolvedToSubjectValue }];
   }
   if (factIdentity.startsWith('offer:promo:')) {
     const code = factIdentity.slice('offer:promo:'.length);
@@ -225,7 +227,12 @@ function bindingsForIdentity(factIdentity: string): ComparisonKeyBinding[] {
   return [];
 }
 
-function pickBetterSubjectValue(left: ComparisonSubjectValue, right: ComparisonSubjectValue): ComparisonSubjectValue {
+function pickBetterSubjectValue(
+  left: ComparisonSubjectValue,
+  right: ComparisonSubjectValue,
+  key?: string,
+  primaryDomain?: string,
+): ComparisonSubjectValue {
   const rank = (value: ComparisonSubjectValue) => {
     if (value.state === 'present') return 3;
     if (value.state === 'explicitly_absent') return 2;
@@ -235,22 +242,39 @@ function pickBetterSubjectValue(left: ComparisonSubjectValue, right: ComparisonS
   const rightRank = rank(right);
   if (leftRank !== rightRank) return leftRank > rightRank ? left : right;
 
+  if (left.state === 'present' && right.state === 'present' && key?.startsWith('offer.discount:')) {
+    const leftHost = hostAuthorityRank(left.provenance?.sourceUrl ?? '', primaryDomain);
+    const rightHost = hostAuthorityRank(right.provenance?.sourceUrl ?? '', primaryDomain);
+    if (leftHost !== rightHost) {
+      return leftHost < rightHost ? left : right;
+    }
+
+    const leftAmount = typeof left.value?.amount === 'number' ? left.value.amount : 0;
+    const rightAmount = typeof right.value?.amount === 'number' ? right.value.amount : 0;
+    if (leftAmount !== rightAmount) {
+      return rightAmount > leftAmount ? right : left;
+    }
+  }
+
   const leftTime = left.provenance ? Date.parse(left.provenance.observedAt) : 0;
   const rightTime = right.provenance ? Date.parse(right.provenance.observedAt) : 0;
   return leftTime >= rightTime ? left : right;
 }
 
 function collectSubjectFacts(
-  
   sources: SourceEvidence[],
+  primaryDomain?: string,
 ): Map<string, ComparisonSubjectValue> {
   const factsByKey = new Map<string, ComparisonSubjectValue>();
 
-  for (const [factIdentity, resolvedFact] of mergeSubjectCurrentState(sources)) {
+  for (const [factIdentity, resolvedFact] of mergeSubjectCurrentState(sources, primaryDomain)) {
     for (const binding of bindingsForIdentity(factIdentity)) {
       const candidate = binding.resolve(resolvedFact);
       const existing = factsByKey.get(binding.key);
-      factsByKey.set(binding.key, existing ? pickBetterSubjectValue(existing, candidate) : candidate);
+      factsByKey.set(
+        binding.key,
+        existing ? pickBetterSubjectValue(existing, candidate, binding.key, primaryDomain) : candidate,
+      );
     }
   }
 
@@ -287,6 +311,13 @@ function readNumericDelta(
     return { ownedValue, competitorValue, unit: 'percent' };
   }
 
+  if (key === 'offer.discount:percentage') {
+    const ownedValue = owned.value.amount;
+    const competitorValue = competitor.value.amount;
+    if (typeof ownedValue !== 'number' || typeof competitorValue !== 'number') return null;
+    return { ownedValue, competitorValue, unit: 'percent' };
+  }
+
   return null;
 }
 
@@ -304,7 +335,8 @@ export function buildBrandComparison(input: BuildBrandComparisonInput): BrandCom
 
   for (const subjectId of subjectIds) {
     const sources = evidenceBySubject.get(subjectId) ?? [];
-    const subjectFacts = collectSubjectFacts(sources);
+    const subject = subjectId === input.ownedSubject.subjectId ? input.ownedSubject : input.competitors.find((c) => c.subjectId === subjectId);
+    const subjectFacts = collectSubjectFacts(sources, subject?.domain);
 
     for (const [key, value] of subjectFacts) {
       const valuesBySubjectId = factsByKey.get(key) ?? {};
@@ -312,7 +344,7 @@ export function buildBrandComparison(input: BuildBrandComparisonInput): BrandCom
       factsByKey.set(key, valuesBySubjectId);
     }
 
-    const products = resolveSubjectProductFacts(sources).map((product) => ({
+    const products = resolveSubjectProductFacts(sources, subject?.domain).map((product) => ({
       productUrl: product.productUrl,
       name: mapProductFact(product.name),
       price: mapProductFact(product.currentPrice),

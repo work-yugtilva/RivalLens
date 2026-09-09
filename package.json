@@ -20,8 +20,10 @@
     "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^9.35.0",
     "@next/eslint-plugin-next": "^15.5.3",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^20.17.30",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",

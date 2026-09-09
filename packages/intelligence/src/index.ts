@@ -38,3 +38,20 @@ export {
   competitiveReportHash,
   composeCompetitiveIntelligenceReport,
 } from './reports';
+
+export {
+  buildIntelligenceContext,
+  canonicalContext,
+  intelligenceContextHash,
+  type BuildIntelligenceContextInput,
+} from './context';
+
+export {
+  validateIntelligenceSynthesis,
+  type IndexedItemValidationResult,
+  type IntelligenceValidationError,
+  type IntelligenceValidationErrorCode,
+  type IntelligenceValidationResult,
+  type ItemValidationResult,
+  type ValidateIntelligenceSynthesisInput,
+} from './validation';

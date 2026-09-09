@@ -110,14 +110,17 @@ function buildStatus(input: {
   const partial = report.completeness.state !== 'complete';
   const count = report.competitors.length;
   return {
-    state: partial ? 'partial' : 'complete',
-    label: partial ? 'Partial' : 'Complete',
+    state: report.completeness.state,
+    label:
+      report.completeness.state === 'insufficient'
+        ? 'Insufficient'
+        : partial
+          ? 'Partial'
+          : 'Complete',
     competitorCountLabel: `${count} ${plural(count, 'competitor')}`,
     generatedLabel: `generated ${formatRelative(report.generatedAt, input.now)}`,
     gapCountLabel:
-      partial && input.gapCount > 0
-        ? `${input.gapCount} ${plural(input.gapCount, 'gap')}`
-        : null,
+      partial && input.gapCount > 0 ? `${input.gapCount} ${plural(input.gapCount, 'gap')}` : null,
   };
 }
 
@@ -128,14 +131,17 @@ function countGaps(report: CompetitiveIntelligenceReport): number {
     completeness.signals.generationNeeded.length +
     completeness.hypotheses.generationNeeded.length +
     completeness.experiments.generationNeeded.length;
-  const primary = completeness.comparisonUnknown.length + generation;
-  if (primary > 0) return primary;
-  return completeness.hypotheses.unresolved.length + completeness.experiments.unresolved.length;
+  return (
+    unresolvedComparisons(report).length +
+    generation +
+    completeness.hypotheses.unresolved.length +
+    completeness.experiments.unresolved.length
+  );
 }
 
 function buildNotice(report: CompetitiveIntelligenceReport): CompletenessNoticeView {
   const { completeness } = report;
-  const unknown = completeness.comparisonUnknown.length;
+  const unknown = unresolvedComparisons(report).length;
   const signals = completeness.signals.generationNeeded.length;
   const hypotheses = completeness.hypotheses.generationNeeded.length;
   const experiments = completeness.experiments.generationNeeded.length;
@@ -161,13 +167,19 @@ function buildNotice(report: CompetitiveIntelligenceReport): CompletenessNoticeV
       `${countWord(experiments)} recommended ${plural(experiments, 'test')} ${plural(experiments, 'has', 'have')} not been generated yet`,
     );
   }
-  if (clauses.length === 0) {
-    const waiting =
-      completeness.hypotheses.unresolved.length + completeness.experiments.unresolved.length;
+  const unresolvedHypotheses = completeness.hypotheses.unresolved.length;
+  const unresolvedExperiments = completeness.experiments.unresolved.length;
+  if (unresolvedHypotheses > 0) {
     clauses.push(
-      `${countWord(waiting)} ${plural(waiting, 'interpretation')} ${plural(waiting, 'is', 'are')} waiting on evidence that has not resolved`,
+      `${countWord(unresolvedHypotheses)} ${plural(unresolvedHypotheses, 'interpretation')} ${plural(unresolvedHypotheses, 'is', 'are')} waiting on evidence that has not resolved`,
     );
   }
+  if (unresolvedExperiments > 0) {
+    clauses.push(
+      `${countWord(unresolvedExperiments)} recommended ${plural(unresolvedExperiments, 'test')} ${plural(unresolvedExperiments, 'is', 'are')} waiting on evidence that has not resolved`,
+    );
+  }
+  if (clauses.length === 0) clauses.push('Some supporting evidence is incomplete');
 
   return {
     title: 'This report is partial. What it does show is still verified.',
@@ -180,9 +192,7 @@ function buildNotice(report: CompetitiveIntelligenceReport): CompletenessNoticeV
  * notice, describing everything a regeneration would pick up. Items awaiting
  * generation never carry a control of their own.
  */
-function buildGenerationNotice(
-  report: CompetitiveIntelligenceReport,
-): GenerationNoticeView | null {
+function buildGenerationNotice(report: CompetitiveIntelligenceReport): GenerationNoticeView | null {
   const { completeness } = report;
   const signals = completeness.signals.generationNeeded.length;
   const hypotheses = completeness.hypotheses.generationNeeded.length;
@@ -201,19 +211,37 @@ function buildGenerationNotice(
   };
 }
 
+/** Deduplicate the same unknown across comparison and signal projections. */
+function unresolvedComparisons(report: CompetitiveIntelligenceReport) {
+  const entries = new Map(
+    report.completeness.comparisonUnknown.map((entry) => [
+      `${entry.competitorId}:${entry.comparisonKey}`,
+      entry,
+    ]),
+  );
+  for (const { logicalIdentity } of report.completeness.signals.unresolved) {
+    const { competitorId, comparisonKey } = logicalIdentity;
+    const key = `${competitorId}:${comparisonKey}`;
+    if (!entries.has(key)) entries.set(key, { competitorId, comparisonKey, subjectIds: [] });
+  }
+  return [...entries.values()];
+}
+
 function buildUnresolvedRows(report: CompetitiveIntelligenceReport): UnresolvedRowView[] {
   const competitorNameById = new Map(
     report.competitors.map((competitor) => [competitor.id, competitor.name]),
   );
 
-  return report.completeness.comparisonUnknown.map((unknown, index) => {
+  return unresolvedComparisons(report).map((unknown, index) => {
     const competitorName = competitorNameById.get(unknown.competitorId) ?? 'the competitor';
     const ownedUnknown = unknown.subjectIds.includes(report.brandId);
     const competitorUnknown = unknown.subjectIds.includes(unknown.competitorId);
     const phrase = comparisonKeyPhrase(unknown.comparisonKey);
 
     let reason: string;
-    if (ownedUnknown && competitorUnknown) {
+    if (unknown.subjectIds.length === 0) {
+      reason = 'the comparison could not be resolved from the captured evidence.';
+    } else if (ownedUnknown && competitorUnknown) {
       reason = 'evidence has not been collected for both brands yet.';
     } else if (competitorUnknown) {
       reason = `no ${phrase} evidence has been captured for ${competitorName} yet.`;

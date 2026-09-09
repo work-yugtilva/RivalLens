@@ -1,17 +1,16 @@
 import { redirect } from 'next/navigation';
-import { AppShell } from '@/components/app-shell/app-shell';
-import { ComparisonSetMenu } from '@/components/overview/comparison-set-menu';
+import { Suspense } from 'react';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { OverviewFrame } from '@/components/overview/overview-frame';
 import { OverviewReport } from '@/components/overview/overview-report';
-import {
-  MobileRegenerateButton,
-  RegenerateButton,
-  ReportHeader,
-  StatusLine,
-} from '@/components/overview/report-header';
-import { NoReportState, ReportError } from '@/components/overview/report-states';
+import { NoReportState, ReportError, ReportSkeleton } from '@/components/overview/report-states';
 import { loadLatestCompetitiveIntelligenceReport } from '@/lib/internal/competitive-reports';
-import { loadBrandContext, resolveCompetitorScope } from '@/lib/overview/brand-context';
-import { resolveReportProvenance } from '@/lib/overview/provenance';
+import {
+  loadBrandContext,
+  resolveCompetitorScope,
+  type BrandContext,
+} from '@/lib/overview/brand-context';
+import { resolveReportProvenance, unavailableReportProvenance } from '@/lib/overview/provenance';
 import { buildReportView } from '@/lib/overview/report-view';
 import type { ShellContextView } from '@/lib/overview/types';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
@@ -46,17 +45,49 @@ export default async function OverviewPage({
     shellContext,
     brand: { id: context.brandId, domain: context.ownedDomain },
     sourcesRefreshed: context.sourcesRefreshedLabel,
+    regenerate: regenerateReport,
+  };
+  return (
+    <Suspense
+      key={competitorIds.join(',')}
+      fallback={
+        <OverviewFrame {...frameProps} status={null}>
+          <ReportSkeleton />
+        </OverviewFrame>
+      }
+    >
+      <LoadedOverview
+        supabase={supabase}
+        context={context}
+        shellContext={shellContext}
+        competitorIds={competitorIds}
+      />
+    </Suspense>
+  );
+}
+
+async function LoadedOverview({
+  supabase,
+  context,
+  shellContext,
+  competitorIds,
+}: {
+  supabase: SupabaseClient;
+  context: BrandContext;
+  shellContext: ShellContextView;
+  competitorIds: string[];
+}) {
+  const frameProps = {
+    shellContext,
+    brand: { id: context.brandId, domain: context.ownedDomain },
+    sourcesRefreshed: context.sourcesRefreshedLabel,
+    regenerate: regenerateReport,
   };
 
   if (competitorIds.length === 0) {
     return (
       <OverviewFrame {...frameProps} status={null}>
-        <NoReportState
-          competitorLabels={[]}
-          ownedLabel={context.ownedDomain}
-          generate={regenerateReport}
-          competitorIds={[]}
-        />
+        <NoReportState competitorLabels={[]} ownedLabel={context.ownedDomain} competitorIds={[]} />
       </OverviewFrame>
     );
   }
@@ -82,7 +113,6 @@ export default async function OverviewPage({
           <NoReportState
             competitorLabels={competitorDomains(context, competitorIds)}
             ownedLabel={context.ownedDomain}
-            generate={regenerateReport}
             competitorIds={competitorIds}
           />
         </OverviewFrame>
@@ -106,96 +136,32 @@ export default async function OverviewPage({
   try {
     provenance = await resolveReportProvenance(supabase, result.report);
   } catch {
-    return (
-      <OverviewFrame {...frameProps} status={null}>
-        <ReportError detail="The evidence behind this report could not be read." />
-      </OverviewFrame>
-    );
+    provenance = { status: 'ok', provenance: unavailableReportProvenance(result.report) };
   }
 
   return (
     <OverviewFrame {...frameProps} status={view.status}>
       <OverviewReport
+        key={result.report.id}
         report={view}
-        drawers={provenance.status === 'ok' ? provenance.provenance : {}}
+        drawers={
+          provenance.status === 'ok'
+            ? provenance.provenance
+            : unavailableReportProvenance(result.report)
+        }
         competitorIds={competitorIds}
-        regenerate={regenerateReport}
       />
     </OverviewFrame>
-  );
-}
-
-/**
- * Shell plus report column. The header, the tablet meta line and the mobile
- * meta line all read from the same status, so completeness is stated once at
- * every width.
- */
-function OverviewFrame({
-  shellContext,
-  brand,
-  sourcesRefreshed,
-  status,
-  children,
-}: {
-  shellContext: ShellContextView;
-  brand: { id: string; domain: string };
-  sourcesRefreshed: string | null;
-  status: React.ComponentProps<typeof StatusLine>['status'] | null;
-  children: React.ReactNode;
-}) {
-  return (
-    <AppShell
-      nav={{
-        brands: [brand],
-        activeBrandId: brand.id,
-        activeDomain: brand.domain,
-        sourcesRefreshed,
-      }}
-      screenName="Overview"
-      comparisonPair={comparisonPair(brand.domain, shellContext)}
-      tabletActions={
-        <div className="flex items-center gap-2">
-          <ComparisonSetMenu context={shellContext} />
-          <RegenerateButton
-            regenerate={regenerateReport}
-            competitorIds={shellContext.selectedCompetitorIds}
-            variant="ghost"
-          />
-        </div>
-      }
-      mobileAction={
-        <MobileRegenerateButton
-          regenerate={regenerateReport}
-          competitorIds={shellContext.selectedCompetitorIds}
-        />
-      }
-    >
-      {status ? (
-        <StatusLine
-          status={status}
-          className="border-b border-rl-rule-item px-4 py-[13px] tablet:hidden"
-        />
-      ) : null}
-
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {status ? (
-          <ReportHeader status={status} context={shellContext} regenerate={regenerateReport} />
-        ) : null}
-        <div className="pt-0 tablet:px-8 tablet:pt-6 xl:pt-10 xl:pr-0 xl:pl-16">
-          {status ? (
-            <StatusLine status={status} className="mb-5 hidden tablet:flex xl:hidden" />
-          ) : null}
-          {children}
-        </div>
-      </div>
-    </AppShell>
   );
 }
 
 function requestedIds(raw: string | string[] | undefined): string[] | undefined {
   if (raw === undefined) return undefined;
   const values = Array.isArray(raw) ? raw : [raw];
-  return values.flatMap((value) => value.split(',')).map((value) => value.trim()).filter(Boolean);
+  return values
+    .flatMap((value) => value.split(','))
+    .map((value) => value.trim())
+    .filter(Boolean);
 }
 
 function competitorDomains(
@@ -205,11 +171,4 @@ function competitorDomains(
   return competitorIds
     .map((id) => context.competitors.find((competitor) => competitor.id === id)?.domain)
     .filter((domain): domain is string => domain !== undefined);
-}
-
-function comparisonPair(ownedDomain: string, shellContext: ShellContextView): string {
-  const domains = competitorDomains(shellContext, shellContext.selectedCompetitorIds);
-  if (domains.length === 0) return ownedDomain;
-  if (domains.length === 1) return `${ownedDomain} vs ${domains[0]}`;
-  return `${ownedDomain} vs ${domains.length} competitors`;
 }

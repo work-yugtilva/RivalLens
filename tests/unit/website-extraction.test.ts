@@ -90,4 +90,35 @@ describe('deterministic website extraction', () => {
     expect(websiteObservationCandidateSchema.parse(candidate)).not.toHaveProperty('snapshotId');
     expect(() => websiteObservationCandidateSchema.parse({ ...candidate, extractionMethod: 'ai' })).toThrow();
   });
+
+  it('never extracts positive subscription availability from negated subscription language', () => {
+    const cases = [
+      '<main>No subscription, ever</main>',
+      '<main>Without a subscription, our tracker works anywhere.</main>',
+      '<main>Subscription not required for any smart features.</main>',
+      '<main>Never requires a subscription to locate your wallet.</main>',
+      '<main>Zero subscriptions needed. 100% free tracking app.</main>',
+    ];
+
+    for (const html of cases) {
+      const candidates = extractWebsiteObservations(snapshot('product', html));
+      const subs = fact(candidates, 'subscription.details');
+      expect(subs.filter((candidate) => candidate.payload.available === true)).toHaveLength(0);
+    }
+  });
+
+  it('does not fabricate promo codes from nearby headings or arbitrary copy', () => {
+    const cases = [
+      '<main><h3>Promo Codes</h3><p>Everything you love about smart wallets.</p></main>',
+      '<main><span>Promo Codes</span><span>Everything on sale</span></main>',
+      '<main><p>Enter coupon codes at checkout for discounts.</p></main>',
+      '<main><p>Check our promo codes before checkout.</p></main>',
+    ];
+
+    for (const html of cases) {
+      const candidates = extractWebsiteObservations(snapshot('pricing_offers', html));
+      const promos = fact(candidates, 'offer.promo');
+      expect(promos).toHaveLength(0);
+    }
+  });
 });

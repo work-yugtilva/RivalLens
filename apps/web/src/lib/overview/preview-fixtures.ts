@@ -11,10 +11,9 @@ import {
   competitiveIntelligenceReportSchema,
   type CompetitiveIntelligenceReport,
 } from '@rivallens/schemas';
-import { itemKindLabel, reportPlacementSentence } from './labels';
 import type { EvidenceDrawerView } from './provenance-types';
-import { reportItemKey } from './report-view';
-import type { ReportView } from './types';
+import { buildReportProvenance } from './provenance-view';
+import type { ReferencedEvidence } from './provenance-evidence';
 
 export const PREVIEW_STATES = [
   'complete',
@@ -125,7 +124,7 @@ function partialReport(): CompetitiveIntelligenceReport {
       yourAdvantages: { state: 'unresolved', available: 1, omitted: 1 },
       competitorAdvantages: { state: 'supported', available: 2, omitted: 0 },
       appearsToBeWorking: { state: 'supported', available: 2, omitted: 0 },
-      whatToTestNext: { state: 'supported', available: 2, omitted: 1 },
+      whatToTestNext: { state: 'supported', available: 1, omitted: 0 },
     },
   } as RawReport['completeness'];
   return parse(report);
@@ -235,126 +234,83 @@ export const PREVIEW_CAPTURED_AT = '2026-09-04T09:16:00.000Z';
 export const PREVIEW_NOW = Date.parse('2026-09-04T14:00:00.000Z');
 export const PREVIEW_CAPTURED_PAGE_TYPES = ['Homepage', 'Product page'];
 
-/**
- * Drawer views for the previewed report, derived from the rendered rows rather
- * than from the database, so the drawer's proportions and hierarchy can be
- * compared against overview-evidence-drawer.html without Supabase.
- */
-export function previewDrawers(view: ReportView): Record<string, EvidenceDrawerView> {
-  const drawers: Record<string, EvidenceDrawerView> = {};
-
-  for (const section of view.sections) {
-    section.rows.forEach((row, index) => {
-      const kindLabel = itemKindLabel(row.itemType);
-      const key = reportItemKey(section.name, index);
-      const title = row.itemType === 'strategic_hypothesis' ? row.eyebrow : row.title;
-
-      drawers[key] = {
-        itemKey: key,
-        kindLabel,
-        title,
-        heading: 'Why RivalLens is telling you this',
-        steps: [
-          {
-            kind: 'report',
-            label: 'What the report says',
-            text:
-              row.itemType === 'competitive_fact'
-                ? row.statement
-                : reportPlacementSentence(section.name, kindLabel),
-          },
-          ...(row.itemType === 'strategic_hypothesis'
-            ? ([
-                {
-                  kind: 'meaning' as const,
-                  label: 'What it might mean',
-                  statement: row.statement,
-                  uncertainty: row.uncertainty,
-                },
-              ] as const)
-            : []),
-          {
-            kind: 'compared',
-            label: 'What we compared',
-            text:
-              row.itemType === 'competitive_fact'
-                ? row.statement
-                : 'Free-shipping threshold — the competitor’s threshold is lower than yours.',
-            pair:
-              row.itemType === 'competitive_fact'
-                ? {
-                    ownedLabel: row.ownedLabel,
-                    ownedValue: row.values.owned.text,
-                    ownedUnresolved: row.values.owned.kind === 'unresolved',
-                    competitorLabel: row.competitorLabel,
-                    competitorValue: row.values.competitor.text,
-                    competitorUnresolved: row.values.competitor.kind === 'unresolved',
-                  }
-                : {
-                    ownedLabel: 'You',
-                    ownedValue: '$75',
-                    ownedUnresolved: false,
-                    competitorLabel: 'rival.test',
-                    competitorValue: '$50',
-                    competitorUnresolved: false,
-                  },
-          },
-          {
-            kind: 'evidence',
-            label: 'What we saw',
-            rows:
-              row.itemType === 'competitive_fact'
-                ? [
-                    {
-                      key: 'owned',
-                      role: 'owned' as const,
-                      domain: PREVIEW_OWNED_DOMAIN,
-                      pageType: 'Shipping & returns page',
-                      observedFact: row.values.owned.text,
-                      explicitlyAbsent: row.values.owned.kind === 'unresolved',
-                      capturedLabel: '4 Sept 2026, 09:14',
-                      confidenceLabel: 'Confidence 95%',
-                    },
-                    {
-                      key: 'competitor',
-                      role: 'competitor' as const,
-                      domain: row.competitorLabel,
-                      pageType: 'Shipping & returns page',
-                      observedFact: row.values.competitor.text,
-                      explicitlyAbsent: row.values.competitor.kind === 'unresolved',
-                      capturedLabel: '4 Sept 2026, 09:16',
-                      confidenceLabel: 'Confidence 95%',
-                    },
-                  ]
-                : [
-                    {
-                      key: 'owned',
-                      role: 'owned' as const,
-                      domain: PREVIEW_OWNED_DOMAIN,
-                      pageType: 'Shipping & returns page',
-                      observedFact: 'Free shipping on orders over $75',
-                      explicitlyAbsent: false,
-                      capturedLabel: '4 Sept 2026, 09:14',
-                      confidenceLabel: 'Confidence 95%',
-                    },
-                    {
-                      key: 'competitor',
-                      role: 'competitor' as const,
-                      domain: 'rival.test',
-                      pageType: 'Shipping & returns page',
-                      observedFact: 'Free shipping on orders over $50',
-                      explicitlyAbsent: false,
-                      capturedLabel: '4 Sept 2026, 09:16',
-                      confidenceLabel: 'Confidence 95%',
-                    },
-                  ],
-            note: null,
-          },
-        ],
-        footerNote: view.footerNote,
-      };
-    });
+/** Fixed captured records, shared with the production provenance presentation. */
+export function previewEvidence(report: CompetitiveIntelligenceReport): {
+  report: CompetitiveIntelligenceReport;
+  evidence: ReferencedEvidence;
+} {
+  const copy = structuredClone(report);
+  const evidence: ReferencedEvidence = {
+    ownedDomain: PREVIEW_OWNED_DOMAIN,
+    sources: [],
+    snapshots: [],
+    observations: [],
+  };
+  const sourceIds = new Set<string>();
+  const observationIds = new Set<string>();
+  const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+  for (const item of Object.values(copy.sections).flat()) {
+    for (const signal of item.provenance.signals) {
+      const kind =
+        signal.comparisonKey === 'policy.return_window'
+          ? 0
+          : signal.comparisonKey === 'subscription.available'
+            ? 2
+            : 1;
+      for (const ref of signal.evidence) {
+        const owned = ref.role === 'owned';
+        const n = 900 + kind * 10 + (owned ? 0 : 1);
+        ref.sourceId = uuid(n);
+        ref.snapshotId = uuid(n + 100);
+        const captured = owned ? '2026-09-04T09:14:00.000Z' : PREVIEW_CAPTURED_AT;
+        if (!sourceIds.has(ref.sourceId)) {
+          sourceIds.add(ref.sourceId);
+          evidence.sources.push({
+            id: ref.sourceId,
+            canonical_url: `https://${owned ? evidence.ownedDomain : item.competitorName}/${kind === 0 ? 'returns' : kind === 1 ? 'offers' : 'subscription'}`,
+            brand_id: copy.brandId,
+            competitor_id: owned ? null : item.competitorId,
+            source_type:
+              kind === 0 ? 'shipping_returns' : kind === 1 ? 'pricing_offers' : 'subscription',
+          });
+          evidence.snapshots.push({
+            id: ref.snapshotId,
+            source_id: ref.sourceId,
+            captured_at: captured,
+          });
+        }
+        if (ref.observationId && !observationIds.has(ref.observationId)) {
+          observationIds.add(ref.observationId);
+          evidence.observations.push({
+            id: ref.observationId,
+            snapshot_id: ref.snapshotId,
+            subject_id: owned ? copy.brandId : item.competitorId,
+            fact_type:
+              kind === 0
+                ? 'policy.return_window'
+                : kind === 1
+                  ? 'offer.free_shipping'
+                  : 'subscription.details',
+            payload:
+              kind === 0
+                ? { duration: owned ? 60 : 30, unit: 'days' }
+                : kind === 1
+                  ? { threshold: owned ? 75 : 50 }
+                  : { available: !owned },
+            source_url: `https://${owned ? PREVIEW_OWNED_DOMAIN : item.competitorName}/`,
+            observed_at: captured,
+            confidence: ref.confidence,
+          });
+        }
+      }
+    }
   }
+  return { report: copy, evidence };
+}
 
-  return drawers;
+export function previewDrawers(
+  report: CompetitiveIntelligenceReport,
+): Record<string, EvidenceDrawerView> {
+  const fixture = previewEvidence(report);
+  return buildReportProvenance(fixture.report, fixture.evidence);
 }

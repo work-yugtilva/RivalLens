@@ -23,11 +23,13 @@ export function EvidenceDrawer({
   drawerId,
   open,
   onClose,
+  returnFocus,
 }: {
   drawer: EvidenceDrawerView | null;
   drawerId: string;
   open: boolean;
   onClose: () => void;
+  returnFocus: () => void;
 }) {
   const isDesktop = useIsDesktop();
 
@@ -49,9 +51,23 @@ export function EvidenceDrawer({
         side="right"
         showCloseButton={false}
         aria-describedby={undefined}
+        onInteractOutside={(event) => {
+          // Selecting another report row updates this non-modal sheet in place.
+          if (
+            isDesktop &&
+            event.target instanceof Element &&
+            event.target.closest('[data-report-row]')
+          ) {
+            event.preventDefault();
+          }
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          returnFocus();
+        }}
         overlayClassName="bg-[rgba(22,24,29,0.14)] xl:!hidden"
         className={cn(
-          'flex w-full max-w-none flex-col gap-0 border-rl-rule bg-white p-0 shadow-none sm:max-w-none',
+          'font-rl-sans antialiased flex w-full max-w-none flex-col gap-0 border-rl-rule bg-white p-0 shadow-none sm:max-w-none',
           'tablet:w-[480px] tablet:border-l tablet:shadow-[-12px_0_32px_rgba(16,24,40,0.05)]',
         )}
       >
@@ -67,14 +83,12 @@ function DrawerBody({ drawer }: { drawer: EvidenceDrawerView }) {
       <div className="flex-none border-b border-rl-rule px-5 pt-5 pb-4 tablet:px-[26px] tablet:pt-[22px] tablet:pb-[18px]">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-11 tracking-[0.07em] text-rl-faint uppercase">
-              {drawer.kindLabel}
-            </p>
+            <p className="text-11 tracking-[0.07em] text-rl-faint uppercase">{drawer.kindLabel}</p>
             <SheetTitle className="mt-[7px] text-16 leading-[1.35] font-semibold tracking-[-0.012em] text-rl-ink">
               {drawer.title}
             </SheetTitle>
           </div>
-          <SheetClose className="flex size-7 flex-none items-center justify-center rounded-[5px] text-rl-muted hover:bg-rl-ghost-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rl-indigo">
+          <SheetClose className="flex size-11 tablet:size-7 flex-none items-center justify-center rounded-[5px] text-rl-muted hover:bg-rl-ghost-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rl-indigo">
             <CloseIcon />
             <span className="sr-only">Close evidence</span>
           </SheetClose>
@@ -84,11 +98,7 @@ function DrawerBody({ drawer }: { drawer: EvidenceDrawerView }) {
       <div className="flex-1 overflow-y-auto px-5 pt-5 pb-6 tablet:px-[26px] tablet:pt-[22px]">
         <h3 className="text-14 font-semibold text-rl-ink">{drawer.heading}</h3>
 
-        <ol className="relative mt-[18px] list-none pl-6">
-          <span
-            aria-hidden
-            className="absolute top-1.5 bottom-2.5 left-1 w-px bg-rl-control"
-          />
+        <ol className="relative mt-[18px] list-none pl-6 before:absolute before:top-1.5 before:bottom-2.5 before:left-1 before:w-px before:bg-rl-control">
           {drawer.steps.map((step, index) => (
             <ProvenanceStep
               key={step.kind}
@@ -104,7 +114,7 @@ function DrawerBody({ drawer }: { drawer: EvidenceDrawerView }) {
         <p className="text-13 text-rl-faint">{drawer.footerNote}</p>
         <Link
           href="/evidence"
-          className="inline-flex flex-none items-center gap-1 text-13 text-rl-indigo hover:text-rl-indigo-deep hover:underline hover:underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rl-indigo"
+          className="inline-flex min-h-11 tablet:min-h-0 flex-none items-center gap-1 text-13 text-rl-indigo hover:text-rl-indigo-deep hover:underline hover:underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rl-indigo"
         >
           <span>Open in Evidence</span>
           <ChevronRightIcon />
@@ -162,9 +172,7 @@ function ComparedPair({ pair }: { pair: ComparedPairView }) {
         <dd
           className={cn(
             'mt-1 text-13',
-            pair.ownedUnresolved
-              ? 'text-rl-muted italic'
-              : 'font-rl-mono font-medium text-rl-ink',
+            pair.ownedUnresolved ? 'text-rl-muted italic' : 'font-rl-mono font-medium text-rl-ink',
           )}
         >
           {pair.ownedValue}
@@ -189,11 +197,7 @@ function ComparedPair({ pair }: { pair: ComparedPairView }) {
   );
 }
 
-function EvidenceList({
-  step,
-}: {
-  step: Extract<ProvenanceStepView, { kind: 'evidence' }>;
-}) {
+function EvidenceList({ step }: { step: Extract<ProvenanceStepView, { kind: 'evidence' }> }) {
   if (step.rows.length === 0) {
     return (
       <p className="mt-3 rounded-md border border-rl-rule bg-rl-ground px-3.5 py-3 text-13 leading-[1.5] text-rl-muted">
@@ -209,19 +213,15 @@ function EvidenceList({
           <EvidenceRow key={row.key} row={row} first={index === 0} />
         ))}
       </div>
-      {step.note ? (
-        <p className="mt-2.5 text-13 leading-[1.5] text-rl-muted">{step.note}</p>
-      ) : null}
+      {step.note ? <p className="mt-2.5 text-13 leading-[1.5] text-rl-muted">{step.note}</p> : null}
     </>
   );
 }
 
 function EvidenceRow({ row, first }: { row: EvidenceRowView; first: boolean }) {
   return (
-    <div
-      className={cn('bg-white px-3.5 py-[13px]', !first && 'border-t border-rl-rule-item')}
-    >
-      <div className="flex items-center justify-between gap-3">
+    <div className={cn('bg-white px-3.5 py-[13px]', !first && 'border-t border-rl-rule-item')}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div className="flex min-w-0 items-center gap-[7px]">
           <span
             aria-hidden
@@ -230,9 +230,9 @@ function EvidenceRow({ row, first }: { row: EvidenceRowView; first: boolean }) {
               row.role === 'owned' ? 'bg-rl-indigo' : 'bg-rl-graphite',
             )}
           />
-          <span className="truncate font-rl-mono text-13 text-rl-ink">{row.domain}</span>
+          <span className="break-all font-rl-mono text-13 text-rl-ink">{row.domain}</span>
         </div>
-        <span className="flex-none text-12 text-rl-muted">{row.pageType}</span>
+        <span className="text-13 text-rl-muted">{row.pageType}</span>
       </div>
       <p
         className={cn(
@@ -242,7 +242,7 @@ function EvidenceRow({ row, first }: { row: EvidenceRowView; first: boolean }) {
       >
         {row.observedFact}
       </p>
-      <div className="mt-2 flex items-center gap-[9px] text-12 text-rl-faint">
+      <div className="mt-2 flex flex-wrap items-center gap-x-[9px] gap-y-1 text-13 text-rl-faint">
         <span className="font-rl-mono">{row.capturedLabel}</span>
         <span aria-hidden className="text-rl-hairline">
           ·

@@ -31,7 +31,7 @@ export function ReportSection({
   last: boolean;
   selectedKey: string | null;
   drawerId: string;
-  onSelect: (itemKey: string) => void;
+  onSelect: (itemKey: string, trigger: HTMLButtonElement) => void;
 }) {
   const gapRows = [...section.unresolved, ...section.awaitingGeneration];
   const total = section.rows.length + gapRows.length;
@@ -52,9 +52,7 @@ export function ReportSection({
           <h2 className="text-13 font-semibold tablet:text-14 xl:tracking-[-0.012em]">
             {section.title}
           </h2>
-          {total > 0 ? (
-            <span className="text-11 text-rl-faint tablet:hidden">{total}</span>
-          ) : null}
+          {total > 0 ? <span className="text-11 text-rl-faint tablet:hidden">{total}</span> : null}
         </div>
         <p className="mt-[5px] text-13 leading-[1.45] text-rl-faint tablet:mt-0 tablet:text-rl-muted xl:mt-[7px]">
           {section.subtitle}
@@ -75,7 +73,7 @@ export function ReportSection({
             const selection = {
               selected: selectedKey === row.key,
               drawerId,
-              onSelect: () => onSelect(row.key),
+              onSelect: (trigger: HTMLButtonElement) => onSelect(row.key, trigger),
             };
 
             if (row.itemType === 'competitive_fact') {
@@ -97,7 +95,12 @@ export function ReportSection({
             return 'title' in row ? (
               <UnresolvedRow key={row.key} row={row} position={position} />
             ) : (
-              <AwaitingGenerationRow key={row.key} row={row} position={position} experiment={experiment} />
+              <AwaitingGenerationRow
+                key={row.key}
+                row={row}
+                position={position}
+                experiment={experiment}
+              />
             );
           })}
         </ItemList>

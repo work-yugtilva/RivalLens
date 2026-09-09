@@ -19,7 +19,7 @@ type RowPosition = { first: boolean; last: boolean };
 type RowSelection = {
   selected: boolean;
   drawerId: string;
-  onSelect: () => void;
+  onSelect: (trigger: HTMLButtonElement) => void;
 };
 
 /** Observed difference. Title, confidence, evidence affordance, statement, values. */

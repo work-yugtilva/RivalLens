@@ -35,11 +35,9 @@ export function CompletenessNotice({ notice }: { notice: CompletenessNoticeView 
 export function GenerationNotice({
   notice,
   competitorIds,
-  regenerate,
 }: {
   notice: GenerationNoticeView;
   competitorIds: string[];
-  regenerate: (formData: FormData) => Promise<void>;
 }) {
   return (
     <div className="mx-4 mb-5 flex flex-col gap-3 rounded-md border border-rl-control bg-rl-ground p-[14px] tablet:mx-0 tablet:mb-6 tablet:flex-row tablet:items-center tablet:gap-3.5 xl:mb-7 xl:w-[896px]">
@@ -49,7 +47,6 @@ export function GenerationNotice({
       </div>
       <div className="flex-none">
         <RegenerateButton
-          regenerate={regenerate}
           competitorIds={competitorIds}
           variant="primary"
           label="Regenerate report"

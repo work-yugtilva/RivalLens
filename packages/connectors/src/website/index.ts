@@ -32,6 +32,10 @@ const COLLECTOR_VERSION = 'website-http-v1';
 const NORMALIZER_VERSION = 'website-text-v1';
 const MAX_DISCOVERED_SOURCES = 40;
 const MAX_HOMEPAGE_LINKS = 120;
+const MAX_COLLECTION_HUBS = 3;
+const MAX_COLLECTION_SOURCES = 8;
+const RESERVED_PRODUCT_CAPACITY = 20;
+const MAX_NON_PRODUCT_SOURCES = MAX_DISCOVERED_SOURCES - RESERVED_PRODUCT_CAPACITY;
 const MAX_SITEMAP_DOCUMENTS = 5;
 const MAX_SITEMAP_URLS = 120;
 
@@ -44,6 +48,25 @@ export {
   WebsiteUrlSafetyError,
 } from './url';
 export { extractWebsiteObservations } from './extract';
+
+export function createPinnedAddressLookup(address: ResolvedAddress) {
+  const pinned = { address: address.address, family: address.family };
+  return ((
+    _hostname: string,
+    options: unknown,
+    callback?: (...args: unknown[]) => void,
+  ) => {
+    const cb = typeof options === 'function' ? options : callback;
+    if (typeof cb !== 'function') {
+      throw new WebsiteConnectorError('Website DNS lookup did not provide a callback.');
+    }
+    if (options && typeof options === 'object' && 'all' in options && options.all) {
+      cb(null, [pinned]);
+      return;
+    }
+    cb(null, pinned.address, pinned.family);
+  }) as import('node:net').LookupFunction;
+}
 
 export interface ResolvedAddress {
   address: string;
@@ -115,6 +138,25 @@ export class WebsiteConnector implements RivalConnector {
       for (const href of extractHomepageLinks(homepageDocument.body)) {
         addDiscoveryCandidate(candidates, new URL(href, homepageDocument.finalUrl), homepageUrl.hostname);
         if (candidates.size >= MAX_DISCOVERED_SOURCES) break;
+      }
+
+      const collectionHubs = [...candidates.values()]
+        .filter((candidate) => candidate.sourceType === 'collection')
+        .slice(0, MAX_COLLECTION_HUBS);
+
+      for (const hub of collectionHubs) {
+        if (candidates.size >= MAX_DISCOVERED_SOURCES) break;
+        const hubUrl = new URL(hub.canonicalUrl);
+        const hubDocument = await this.fetchDiscoveryDocument(hubUrl, homepageUrl.hostname).catch((error) => {
+          if (error instanceof WebsiteUrlSafetyError) throw error;
+          return null;
+        });
+        if (hubDocument) {
+          for (const href of extractHomepageLinks(hubDocument.body)) {
+            addDiscoveryCandidate(candidates, new URL(href, hubDocument.finalUrl), homepageUrl.hostname);
+            if (candidates.size >= MAX_DISCOVERED_SOURCES) break;
+          }
+        }
       }
     }
 
@@ -254,7 +296,7 @@ class NodeWebsiteHttpTransport implements WebsiteHttpTransport {
         Accept: 'text/html,application/xhtml+xml',
         'User-Agent': 'RivalLens/0.1 website snapshot collector',
       },
-      lookup: (_hostname, _options, callback) => callback(null, address.address, address.family),
+      lookup: createPinnedAddressLookup(address),
     };
     const requestFn = url.protocol === 'https:' ? httpsRequest : httpRequest;
 
@@ -300,12 +342,32 @@ function addDiscoveryCandidate(candidates: Map<string, DiscoveredSource>, value:
   try {
     const url = normalizeDiscoveredPageUrl(value, expectedHostname);
     if (isLocaleNavigationPath(url.pathname)) return;
-    if (!candidates.has(url.href) && candidates.size >= MAX_DISCOVERED_SOURCES) return;
+    if (candidates.has(url.href)) return;
+    if (candidates.size >= MAX_DISCOVERED_SOURCES) return;
+
+    const sourceType = classifyWebsitePage(url);
+
+    if (sourceType === 'collection') {
+      let collectionCount = 0;
+      for (const candidate of candidates.values()) {
+        if (candidate.sourceType === 'collection') collectionCount++;
+      }
+      if (collectionCount >= MAX_COLLECTION_SOURCES) return;
+    }
+
+    if (sourceType !== 'product') {
+      let nonProductCount = 0;
+      for (const candidate of candidates.values()) {
+        if (candidate.sourceType !== 'product') nonProductCount++;
+      }
+      if (nonProductCount >= MAX_NON_PRODUCT_SOURCES) return;
+    }
+
     candidates.set(
       url.href,
       discoveredSourceSchema.parse({
         connectorType: 'website',
-        sourceType: classifyWebsitePage(url),
+        sourceType,
         canonicalUrl: url.href,
       }),
     );
@@ -360,10 +422,17 @@ function parseSitemap(xml: string, baseUrl: URL, expectedHostname: string): { in
 }
 
 export function classifyWebsitePage(url: URL): string {
-  const path = url.pathname.toLowerCase();
+  const path = url.pathname.toLowerCase().replace(/\/+$/, '') || '/';
   if (path === '/') return 'homepage';
-  if (/\/(products?|shop)\//.test(path) || /\/(products?)$/.test(path)) return 'product';
-  if (/\/(collections?|categories?)\b/.test(path)) return 'collection';
+
+  if (/^\/(?:products?|shop|collections?|categories?)$/.test(path)) return 'collection';
+  if (/\/(?:products?|shop)\/(?:category|categories|collections?)(?:\/|$)/.test(path)) return 'collection';
+  if (/\/(?:collections?|categories?)\b/.test(path) && !/\/products?\//.test(path)) return 'collection';
+
+  if (/\/(?:products?|shop)\/[^/]+$/.test(path) || /\/products?\/[^/]+/.test(path)) {
+    return 'product';
+  }
+
   if (/\/(pricing|plans?|offers?|sale|deals?|bundles?)\b/.test(path)) return 'pricing_offers';
   if (/^\/(?:pages\/)?(about|our-story|story)(?:\/|$)/.test(path)) return 'about';
   if (/\/(reviews?|testimonials?)\b/.test(path)) return 'reviews_testimonials';

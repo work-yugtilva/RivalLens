@@ -1,5 +1,6 @@
 'use client';
 
+import { GenerationForm } from './generation-form';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { EmptyReportIcon, ErrorIcon, NoticeIcon } from '@/components/app-shell/icons';
@@ -13,12 +14,10 @@ import type { InsufficientView } from '@/lib/overview/types';
 export function NoReportState({
   competitorLabels,
   ownedLabel,
-  generate,
   competitorIds,
 }: {
   competitorLabels: string[];
   ownedLabel: string;
-  generate: (formData: FormData) => Promise<void>;
   competitorIds: string[];
 }) {
   const captured =
@@ -31,24 +30,24 @@ export function NoReportState({
       <EmptyReportIcon className="text-rl-hairline" />
       <h2 className="mt-4 text-17 font-semibold tracking-[-0.015em]">No report yet</h2>
       <p className="mt-2 max-w-[420px] text-14 leading-[1.55] text-rl-muted">
-        {captured} Generating the first report compares them and derives the four sections from
-        that evidence.
+        {captured} Generating the first report compares them and derives the four sections from that
+        evidence.
       </p>
       <div className="mt-5 flex flex-wrap gap-2.5">
-        <form action={generate}>
-          {competitorIds.map((id) => (
-            <input key={id} type="hidden" name="competitorIds" value={id} />
-          ))}
-          <button
-            type="submit"
-            className="inline-flex h-[34px] items-center rounded-md bg-rl-indigo px-3.5 text-13 font-medium text-white hover:bg-rl-indigo-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rl-indigo"
-          >
-            Generate first report
-          </button>
-        </form>
+        <GenerationForm competitorIds={competitorIds}>
+          {(pending) => (
+            <button
+              disabled={pending}
+              type="submit"
+              className="inline-flex h-11 tablet:h-[34px] items-center rounded-md bg-rl-indigo px-3.5 text-13 font-medium text-white hover:bg-rl-indigo-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rl-indigo"
+            >
+              {pending ? 'Generating…' : 'Generate first report'}
+            </button>
+          )}
+        </GenerationForm>
         <Link
           href="/rivals"
-          className="inline-flex h-[34px] items-center rounded-md border border-rl-control px-3.5 text-13 text-rl-body hover:bg-rl-ghost-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rl-indigo"
+          className="inline-flex h-11 tablet:h-[34px] items-center rounded-md border border-rl-control px-3.5 text-13 text-rl-body hover:bg-rl-ghost-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rl-indigo"
         >
           Add another competitor
         </Link>
@@ -70,30 +69,34 @@ export function ReportSkeleton() {
   ];
 
   return (
-    <div className="px-4 tablet:px-0 xl:w-[896px]" aria-busy="true" aria-live="polite">
-      <span className="sr-only">Loading the latest competitive intelligence report</span>
-      {SECTION_ORDER.map((name, index) => (
-        <div
-          key={name}
-          className={
-            index === 0
-              ? 'pb-[22px] xl:grid xl:grid-cols-[152px_704px] xl:gap-10'
-              : 'border-t border-rl-rule-item py-[22px] xl:grid xl:grid-cols-[152px_704px] xl:gap-10'
-          }
-        >
-          <p className="text-13 font-semibold text-rl-faint">{SECTION_META[name].title}</p>
-          <div className="mt-3 flex flex-col gap-[9px] xl:mt-0">
-            {widths[index]?.map((width, lineIndex) => (
-              <span
-                key={width + String(lineIndex)}
-                className="block rounded-[3px] bg-rl-skeleton"
-                style={{ width, height: lineIndex === 0 ? 12 : 11 }}
-              />
-            ))}
+    <>
+      <p role="status" className="sr-only">
+        Loading the latest competitive intelligence report
+      </p>
+      <div className="px-4 tablet:px-0 xl:w-[896px]" aria-busy="true">
+        {SECTION_ORDER.map((name, index) => (
+          <div
+            key={name}
+            className={
+              index === 0
+                ? 'pb-[22px] xl:grid xl:grid-cols-[152px_704px] xl:gap-10'
+                : 'border-t border-rl-rule-item py-[22px] xl:grid xl:grid-cols-[152px_704px] xl:gap-10'
+            }
+          >
+            <p className="text-13 font-semibold text-rl-faint">{SECTION_META[name].title}</p>
+            <div className="mt-3 flex flex-col gap-[9px] xl:mt-0">
+              {widths[index]?.map((width, lineIndex) => (
+                <span
+                  key={width + String(lineIndex)}
+                  className="block rounded-[3px] bg-rl-skeleton"
+                  style={{ width, height: lineIndex === 0 ? 12 : 11 }}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -127,7 +130,7 @@ export function InsufficientReport({ insufficient }: { insufficient: Insufficien
       <div className="mt-5 flex flex-wrap items-center gap-2.5">
         <Link
           href="/evidence"
-          className="inline-flex h-8 items-center rounded-md bg-rl-indigo px-[13px] text-13 font-medium text-white hover:bg-rl-indigo-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rl-indigo"
+          className="inline-flex h-11 tablet:h-8 items-center rounded-md bg-rl-indigo px-[13px] text-13 font-medium text-white hover:bg-rl-indigo-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rl-indigo"
         >
           Capture more sources
         </Link>
@@ -160,7 +163,7 @@ export function ReportError({ detail }: { detail?: string }) {
             <button
               type="button"
               onClick={() => router.refresh()}
-              className="inline-flex h-[30px] items-center rounded-md border border-rl-control px-3 text-13 text-rl-body hover:bg-rl-ghost-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rl-indigo"
+              className="inline-flex h-11 tablet:h-[30px] items-center rounded-md border border-rl-control px-3 text-13 text-rl-body hover:bg-rl-ghost-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rl-indigo"
             >
               Try again
             </button>

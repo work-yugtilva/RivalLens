@@ -5,6 +5,15 @@ import { createBrandAndCompetitors } from './actions';
 
 export const dynamic = 'force-dynamic';
 
+/** Supabase embeds a many-to-one row as an object, not a one-element array. */
+function embeddedName(
+  relation: { name?: string } | { name?: string }[] | null | undefined,
+  fallback: string,
+) {
+  const row = Array.isArray(relation) ? relation[0] : relation;
+  return row?.name ?? fallback;
+}
+
 export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ created?: string }> }) {
   const { created } = await searchParams;
   const supabase = await createServerSupabaseClient();
@@ -31,7 +40,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
               </option>
               {memberships.map((membership) => (
                 <option key={membership.organization_id} value={membership.organization_id}>
-                  {membership.organizations?.[0]?.name ?? membership.organization_id}
+                  {embeddedName(membership.organizations, membership.organization_id)}
                 </option>
               ))}
             </select>

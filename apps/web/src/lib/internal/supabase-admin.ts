@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { createClient } from '@supabase/supabase-js';
-import { getServerEnv } from '@rivallens/schemas';
+import { getServerEnv, getSupabaseSecretKey } from '@rivallens/schemas';
 
 /**
  * Internal operational client. It bypasses RLS and must never authorize a
@@ -10,7 +10,7 @@ import { getServerEnv } from '@rivallens/schemas';
  */
 export function createInternalSupabaseAdminClient() {
   const env = getServerEnv();
-  return createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+  return createClient(env.NEXT_PUBLIC_SUPABASE_URL, getSupabaseSecretKey(env), {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }

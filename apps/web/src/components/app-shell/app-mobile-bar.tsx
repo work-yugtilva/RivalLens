@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import { MenuIcon, WordmarkIcon } from './icons';
+import { CloseIcon, MenuIcon, WordmarkIcon } from './icons';
 import { navItems } from './nav-items';
 
 /**
@@ -37,6 +37,7 @@ export function AppMobileBar({
         <SheetContent
           side="left"
           showCloseButton={false}
+          aria-describedby={undefined}
           className="w-[264px] gap-0 border-r border-rl-rule bg-rl-sidebar font-rl-sans p-0 sm:max-w-[264px]"
         >
           <div className="flex items-center gap-2 border-b border-rl-rule px-5 py-4">
@@ -44,6 +45,12 @@ export function AppMobileBar({
             <SheetTitle className="text-14 font-semibold tracking-[-0.02em] text-rl-ink">
               RivalLens
             </SheetTitle>
+            <SheetClose
+              aria-label="Close navigation"
+              className="ml-auto flex size-11 items-center justify-center rounded-md focus-visible:outline-2 focus-visible:outline-rl-indigo"
+            >
+              <CloseIcon />
+            </SheetClose>
           </div>
           <nav aria-label="Primary" className="flex flex-col gap-px p-3">
             {navItems.map(({ href, label, Icon }) => {
@@ -79,7 +86,7 @@ export function AppMobileBar({
 
       <div className="min-w-0 flex-1">
         <div className="truncate text-14 font-semibold tracking-[-0.01em]">{screenName}</div>
-        <div className="mt-px truncate font-rl-mono text-11 text-rl-faint">{comparisonPair}</div>
+        <div className="mt-px truncate font-rl-mono text-12 text-rl-faint">{comparisonPair}</div>
       </div>
 
       {refreshAction}

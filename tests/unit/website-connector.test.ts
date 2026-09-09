@@ -3,6 +3,7 @@ import {
   normalizeHomepageUrl,
   normalizeDiscoveredPageUrl,
   classifyWebsitePage,
+  createPinnedAddressLookup,
   WebsiteConnector,
   WebsiteConnectorError,
   WebsiteUrlSafetyError,
@@ -69,6 +70,37 @@ describe('website connector URL safety', () => {
     );
     expect(() => normalizeDiscoveredPageUrl('https://other.test/products/shoe', 'example.com')).toThrow(WebsiteUrlSafetyError);
     expect(() => normalizeDiscoveredPageUrl('http://127.0.0.1/products/shoe', 'example.com')).toThrow(WebsiteUrlSafetyError);
+  });
+});
+
+describe('website connector DNS pinning', () => {
+  it('returns an address list when Node 22 requests lookup with all:true', () => {
+    const lookup = createPinnedAddressLookup(publicAddress);
+    let err: NodeJS.ErrnoException | null | undefined;
+    let addresses: unknown;
+    lookup('example.com', { all: true }, ((error: NodeJS.ErrnoException | null, value: unknown) => {
+      err = error;
+      addresses = value;
+    }) as never);
+
+    expect(err).toBeNull();
+    expect(addresses).toEqual([{ address: publicAddress.address, family: 4 }]);
+  });
+
+  it('returns a single address when lookup does not request all results', () => {
+    const lookup = createPinnedAddressLookup(publicAddress);
+    let err: NodeJS.ErrnoException | null | undefined;
+    let address: unknown;
+    let family: unknown;
+    lookup('example.com', { all: false }, ((error: NodeJS.ErrnoException | null, value: unknown, valueFamily?: number) => {
+      err = error;
+      address = value;
+      family = valueFamily;
+    }) as never);
+
+    expect(err).toBeNull();
+    expect(address).toBe(publicAddress.address);
+    expect(family).toBe(4);
   });
 });
 
@@ -208,9 +240,166 @@ describe('website page discovery', () => {
     expect(sources.length).toBeLessThanOrEqual(40);
   });
 
+  it('traverses bounded collection hubs to discover product PDP candidates', async () => {
+    const client = connector({
+      request: async (url) => {
+        if (url.pathname === '/') {
+          return response(
+            200,
+            { 'content-type': 'text/html' },
+            `<html><body>
+               <a href="/collections/wallets">Wallets Collection</a>
+               <a href="/collections/straps">Straps Collection</a>
+             </body></html>`,
+          );
+        }
+        if (url.pathname === '/collections/wallets') {
+          return response(
+            200,
+            { 'content-type': 'text/html' },
+            `<html><body>
+               <a href="/products/elastic-wallet">Elastic Wallet</a>
+               <a href="/products/bifold-wallet">Bifold Wallet</a>
+             </body></html>`,
+          );
+        }
+        if (url.pathname === '/collections/straps') {
+          return response(
+            200,
+            { 'content-type': 'text/html' },
+            `<html><body>
+               <a href="/products/wrist-lanyard">Wrist Lanyard</a>
+             </body></html>`,
+          );
+        }
+        return response(404, { 'content-type': 'text/html' }, 'Not Found');
+      },
+    });
+
+    const sources = await client.discover({
+      subjectId: '5a7b618a-fd34-4d62-a3d2-d2bf6f867170',
+      canonicalUrl: 'example.com',
+    });
+
+    expect(sources).toContainEqual({
+      connectorType: 'website',
+      sourceType: 'product',
+      canonicalUrl: 'https://example.com/products/elastic-wallet',
+    });
+    expect(sources).toContainEqual({
+      connectorType: 'website',
+      sourceType: 'product',
+      canonicalUrl: 'https://example.com/products/bifold-wallet',
+    });
+    expect(sources).toContainEqual({
+      connectorType: 'website',
+      sourceType: 'product',
+      canonicalUrl: 'https://example.com/products/wrist-lanyard',
+    });
+  });
+
+  it('prevents discovery starvation on navigation-heavy sites and discovers products from collection hubs', async () => {
+    const collectionLinks = Array.from({ length: 50 }, (_, i) => `<a href="/collections/cat-${i}">Category ${i}</a>`).join('');
+    const journalLinks = Array.from({ length: 20 }, (_, i) => `<a href="/journal/story-${i}">Story ${i}</a>`).join('');
+
+    const client = connector({
+      request: async (url) => {
+        if (url.pathname === '/') {
+          return response(200, { 'content-type': 'text/html' }, `<html><body>${collectionLinks}${journalLinks}</body></html>`);
+        }
+        if (url.pathname.startsWith('/collections/cat-')) {
+          const catNum = url.pathname.split('/collections/cat-')[1];
+          return response(
+            200,
+            { 'content-type': 'text/html' },
+            `<html><body>
+               <a href="/products/product-${catNum}-a">Product A</a>
+               <a href="/products/product-${catNum}-b">Product B</a>
+             </body></html>`,
+          );
+        }
+        return response(404, { 'content-type': 'text/html' }, 'Not Found');
+      },
+    });
+
+    const sources = await client.discover({
+      subjectId: '5a7b618a-fd34-4d62-a3d2-d2bf6f867170',
+      canonicalUrl: 'example.com',
+    });
+
+    expect(sources.length).toBeLessThanOrEqual(40);
+    const productSources = sources.filter((s) => s.sourceType === 'product');
+    const collectionSources = sources.filter((s) => s.sourceType === 'collection');
+
+    expect(productSources.length).toBeGreaterThanOrEqual(2);
+    expect(collectionSources.length).toBeLessThanOrEqual(8);
+  });
+
+  it('bounds collection hubs fetched during traversal to at most 3', async () => {
+    const fetchedHubs: string[] = [];
+    const collectionLinks = Array.from({ length: 15 }, (_, i) => `<a href="/collections/hub-${i}">Hub ${i}</a>`).join('');
+
+    const client = connector({
+      request: async (url) => {
+        if (url.pathname === '/') {
+          return response(200, { 'content-type': 'text/html' }, `<html><body>${collectionLinks}</body></html>`);
+        }
+        if (url.pathname.startsWith('/collections/hub-')) {
+          fetchedHubs.push(url.pathname);
+          return response(
+            200,
+            { 'content-type': 'text/html' },
+            `<html><body><a href="/products/item-${fetchedHubs.length}">Item</a></body></html>`,
+          );
+        }
+        return response(404, { 'content-type': 'text/html' }, 'Not Found');
+      },
+    });
+
+    const sources = await client.discover({
+      subjectId: '5a7b618a-fd34-4d62-a3d2-d2bf6f867170',
+      canonicalUrl: 'example.com',
+    });
+
+    expect(fetchedHubs.length).toBeLessThanOrEqual(3);
+    expect(sources.length).toBeLessThanOrEqual(40);
+  });
+
+  it('does not restrict direct product discovery on sites with many direct homepage PDP links', async () => {
+    const productLinks = Array.from({ length: 35 }, (_, i) => `<a href="/products/direct-${i}">Product ${i}</a>`).join('');
+
+    const client = connector({
+      request: async (url) => {
+        if (url.pathname === '/') {
+          return response(200, { 'content-type': 'text/html' }, `<html><body>${productLinks}</body></html>`);
+        }
+        return response(404, { 'content-type': 'text/html' }, 'Not Found');
+      },
+    });
+
+    const sources = await client.discover({
+      subjectId: '5a7b618a-fd34-4d62-a3d2-d2bf6f867170',
+      canonicalUrl: 'example.com',
+    });
+
+    const productSources = sources.filter((s) => s.sourceType === 'product');
+    expect(productSources.length).toBe(35);
+    expect(sources.length).toBeLessThanOrEqual(40);
+  });
+
+
   it.each([
     ['/products/widget', 'product'],
     ['/collections/summer', 'collection'],
+    ['/products/category/wallets', 'collection'],
+    ['/products/category/travel', 'collection'],
+    ['/products/categories/bags', 'collection'],
+    ['/products/collections/wallets', 'collection'],
+    ['/products', 'collection'],
+    ['/products/', 'collection'],
+    ['/shop', 'collection'],
+    ['/collections/wallets/products/slim-sleeve', 'product'],
+    ['/products/hide-and-seek-wallet', 'product'],
     ['/pages/offers', 'pricing_offers'],
     ['/about', 'about'],
     ['/reviews', 'reviews_testimonials'],

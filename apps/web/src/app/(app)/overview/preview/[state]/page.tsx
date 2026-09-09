@@ -1,18 +1,8 @@
 import { notFound } from 'next/navigation';
-import { AppShell } from '@/components/app-shell/app-shell';
+import { OverviewFrame } from '@/components/overview/overview-frame';
 import { OverviewReport } from '@/components/overview/overview-report';
-import {
-  MobileRegenerateButton,
-  RegenerateButton,
-  ReportHeader,
-  StatusLine,
-} from '@/components/overview/report-header';
-import {
-  NoReportState,
-  ReportError,
-  ReportSkeleton,
-} from '@/components/overview/report-states';
-import { ComparisonSetMenu } from '@/components/overview/comparison-set-menu';
+import type { GenerationResult } from '@/components/overview/generation-form';
+import { NoReportState, ReportError, ReportSkeleton } from '@/components/overview/report-states';
 import {
   isPreviewState,
   PREVIEW_CAPTURED_AT,
@@ -47,8 +37,9 @@ export function generateStaticParams() {
   return PREVIEW_STATES.map((state) => ({ state }));
 }
 
-async function noop(): Promise<void> {
+async function noop(): Promise<GenerationResult> {
   'use server';
+  return { status: 'success', message: 'Preview report is ready. No saved data was changed.' };
 }
 
 export default async function OverviewPreviewPage({
@@ -73,60 +64,26 @@ export default async function OverviewPreviewPage({
         });
 
   return (
-    <AppShell
-      nav={{
-        brands: [{ id: BRAND_ID, domain: PREVIEW_OWNED_DOMAIN }],
-        activeBrandId: BRAND_ID,
-        activeDomain: PREVIEW_OWNED_DOMAIN,
-        sourcesRefreshed: SHELL_CONTEXT.sourcesRefreshedLabel,
-      }}
-      screenName="Overview"
-      comparisonPair={`${PREVIEW_OWNED_DOMAIN} vs rival.test`}
-      tabletActions={
-        <div className="flex items-center gap-2">
-          <ComparisonSetMenu context={SHELL_CONTEXT} />
-          <RegenerateButton regenerate={noop} competitorIds={[]} variant="ghost" />
-        </div>
-      }
-      mobileAction={<MobileRegenerateButton regenerate={noop} competitorIds={[]} />}
+    <OverviewFrame
+      shellContext={SHELL_CONTEXT}
+      brand={{ id: BRAND_ID, domain: PREVIEW_OWNED_DOMAIN }}
+      sourcesRefreshed={SHELL_CONTEXT.sourcesRefreshedLabel}
+      status={view?.status ?? null}
+      regenerate={noop}
     >
       {view ? (
-        <StatusLine
-          status={view.status}
-          className="border-b border-rl-rule-item px-4 py-[13px] tablet:hidden"
-        />
+        <OverviewReport report={view} drawers={previewDrawers(report!)} competitorIds={[]} />
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {view ? (
-          <ReportHeader status={view.status} context={SHELL_CONTEXT} regenerate={noop} />
-        ) : null}
-        <div className="pt-0 tablet:px-8 tablet:pt-6 xl:pt-10 xl:pr-0 xl:pl-16">
-          {view ? (
-            <StatusLine status={view.status} className="mb-5 hidden tablet:flex xl:hidden" />
-          ) : null}
-
-          {view ? (
-            <OverviewReport
-              report={view}
-              drawers={previewDrawers(view)}
-              competitorIds={[]}
-              regenerate={noop}
-            />
-          ) : null}
-
-          {state === 'no-report' ? (
-            <NoReportState
-              competitorLabels={['rival.test']}
-              ownedLabel={PREVIEW_OWNED_DOMAIN}
-              generate={noop}
-              competitorIds={[]}
-            />
-          ) : null}
-          {state === 'loading' ? <ReportSkeleton /> : null}
-          {state === 'error' ? <ReportError /> : null}
-        </div>
-      </div>
-    </AppShell>
+      {state === 'no-report' ? (
+        <NoReportState
+          competitorLabels={['rival.test']}
+          ownedLabel={PREVIEW_OWNED_DOMAIN}
+          competitorIds={[]}
+        />
+      ) : null}
+      {state === 'loading' ? <ReportSkeleton /> : null}
+      {state === 'error' ? <ReportError /> : null}
+    </OverviewFrame>
   );
 }

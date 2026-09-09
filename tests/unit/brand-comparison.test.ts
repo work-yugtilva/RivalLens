@@ -19,12 +19,13 @@ function observation(
   payload: Record<string, unknown>,
   observedAt = '2026-09-01T12:00:00.000Z',
   snapshotId = '44444444-4444-4444-8444-444444444444',
+  sourceUrl = SOURCE_URL,
 ): EvidenceObservation {
   observationCounter += 1;
   return {
     id: `aaaaaaaa-bbbb-4ccc-8ddd-${String(observationCounter).padStart(12, '0')}`,
     factType,
-    sourceUrl: SOURCE_URL,
+    sourceUrl,
     payload,
     observedAt,
     confidence: 0.9,
@@ -32,9 +33,9 @@ function observation(
   };
 }
 
-function source(sourceType: string, observations: EvidenceObservation[]): SourceEvidence {
+function source(sourceType: string, observations: EvidenceObservation[], sourceId = SOURCE_ID): SourceEvidence {
   return {
-    sourceId: SOURCE_ID,
+    sourceId,
     sourceType,
     snapshots: [{
       id: observations[0]?.snapshotId ?? '44444444-4444-4444-8444-444444444444',
@@ -195,7 +196,214 @@ describe('buildBrandComparison', () => {
       confidence: observed.confidence,
     });
   });
+
+  it('selects authoritative positioning from configured primary domain over localized subdomain', () => {
+    const primaryObs: EvidenceObservation = {
+      id: 'aaaaaaaa-bbbb-4ccc-8ddd-111111111111',
+      factType: 'positioning.homepage',
+      sourceUrl: 'https://brand.test/',
+      payload: { headline: 'Primary Global Headline' },
+      observedAt: '2026-09-01T10:00:00.000Z',
+      confidence: 0.9,
+      snapshotId: 'snap-p1',
+    };
+    const localizedObs: EvidenceObservation = {
+      id: 'aaaaaaaa-bbbb-4ccc-8ddd-222222222222',
+      factType: 'positioning.homepage',
+      sourceUrl: 'https://uk.brand.test/',
+      payload: { headline: 'UK Local Headline' },
+      observedAt: '2026-09-01T12:00:00.000Z',
+      confidence: 0.9,
+      snapshotId: 'snap-l2',
+    };
+
+    const result = buildComparison([
+      {
+        subjectId: OWNED_ID,
+        sources: [
+          {
+            sourceId: 'src-1',
+            sourceType: 'homepage',
+            snapshots: [{ id: 'snap-p1', capturedAt: '2026-09-01T10:00:00.000Z', observations: [primaryObs] }],
+          },
+          {
+            sourceId: 'src-2',
+            sourceType: 'homepage',
+            snapshots: [{ id: 'snap-l2', capturedAt: '2026-09-01T12:00:00.000Z', observations: [localizedObs] }],
+          },
+        ],
+      },
+      {
+        subjectId: COMPETITOR_ID,
+        sources: [source('homepage', [observation('positioning.homepage', { headline: 'Rival Headline' })])],
+      },
+    ]);
+
+    const headline = factKey(result, 'positioning.homepage.headline');
+    expect(headline?.valuesBySubjectId[OWNED_ID]?.value).toEqual({ headline: 'Primary Global Headline' });
+    expect(headline?.valuesBySubjectId[OWNED_ID]?.provenance?.sourceUrl).toBe('https://brand.test/');
+  });
+
+  it('normalizes discount comparison key to offer.discount:percentage and selects headline discount', () => {
+    const result = buildComparison([
+      {
+        subjectId: OWNED_ID,
+        sources: [
+          source('pricing_offers', [
+            observation('offer.discount', { type: 'percentage', amount: 10 }),
+          ]),
+        ],
+      },
+      {
+        subjectId: COMPETITOR_ID,
+        sources: [
+          source('pricing_offers', [
+            observation('offer.discount', { type: 'percentage', amount: 15 }),
+            observation('offer.discount', { type: 'percentage', amount: 20 }),
+          ]),
+        ],
+      },
+    ]);
+
+    expect(result.facts.some((f) => f.key.startsWith('offer.discount:percentage:'))).toBe(false);
+    const fact = factKey(result, 'offer.discount:percentage');
+    expect(fact).toBeDefined();
+    expect(fact?.valuesBySubjectId[OWNED_ID]?.state).toBe('present');
+    expect(fact?.valuesBySubjectId[OWNED_ID]?.value).toEqual({ type: 'percentage', amount: 10 });
+    expect(fact?.valuesBySubjectId[COMPETITOR_ID]?.state).toBe('present');
+    expect(fact?.valuesBySubjectId[COMPETITOR_ID]?.value).toEqual({ type: 'percentage', amount: 20 });
+    expect(fact?.numericDeltas).toEqual([{
+      competitorSubjectId: COMPETITOR_ID,
+      ownedValue: 10,
+      competitorValue: 20,
+      difference: 10,
+      unit: 'percent',
+    }]);
+  });
+
+  it('prefers exact configured host discount over higher localized subdomain discount (geo-aware discount authority)', () => {
+    const result = buildComparison([
+      {
+        subjectId: OWNED_ID,
+        sources: [
+          source('pricing_offers', [
+            observation('offer.discount', { type: 'percentage', amount: 39 }, '2026-09-01T12:00:00.000Z', 'snap-1', 'https://brand.test/pages/sale'),
+          ], 'source-exact'),
+          source('pricing_offers', [
+            observation('offer.discount', { type: 'percentage', amount: 42 }, '2026-09-01T12:00:00.000Z', 'snap-2', 'https://au.brand.test/pages/sale'),
+          ], 'source-subdomain'),
+        ],
+      },
+    ]);
+
+    const fact = factKey(result, 'offer.discount:percentage');
+    expect(fact).toBeDefined();
+    expect(fact?.valuesBySubjectId[OWNED_ID]?.value).toEqual({ type: 'percentage', amount: 39 });
+    expect(fact?.valuesBySubjectId[OWNED_ID]?.provenance?.sourceUrl).toBe('https://brand.test/pages/sale');
+  });
+
+  it('prefers equivalent apex/www host discount over higher localized subdomain discount', () => {
+    const result = buildComparison([
+      {
+        subjectId: OWNED_ID,
+        sources: [
+          source('pricing_offers', [
+            observation('offer.discount', { type: 'percentage', amount: 35 }, '2026-09-01T12:00:00.000Z', 'snap-1', 'https://www.brand.test/pages/sale'),
+          ], 'source-www'),
+          source('pricing_offers', [
+            observation('offer.discount', { type: 'percentage', amount: 42 }, '2026-09-01T12:00:00.000Z', 'snap-2', 'https://au.brand.test/pages/sale'),
+          ], 'source-subdomain'),
+        ],
+      },
+    ]);
+
+    const fact = factKey(result, 'offer.discount:percentage');
+    expect(fact).toBeDefined();
+    expect(fact?.valuesBySubjectId[OWNED_ID]?.value).toEqual({ type: 'percentage', amount: 35 });
+    expect(fact?.valuesBySubjectId[OWNED_ID]?.provenance?.sourceUrl).toBe('https://www.brand.test/pages/sale');
+  });
+
+  it('falls back to localized subdomain discount when configured host has no discount', () => {
+    const result = buildComparison([
+      {
+        subjectId: OWNED_ID,
+        sources: [
+          source('pricing_offers', [
+            observation('offer.discount', { type: 'percentage', amount: 42 }, '2026-09-01T12:00:00.000Z', 'snap-1', 'https://au.brand.test/pages/sale'),
+          ], 'source-subdomain'),
+        ],
+      },
+    ]);
+
+    const fact = factKey(result, 'offer.discount:percentage');
+    expect(fact).toBeDefined();
+    expect(fact?.valuesBySubjectId[OWNED_ID]?.value).toEqual({ type: 'percentage', amount: 42 });
+    expect(fact?.valuesBySubjectId[OWNED_ID]?.provenance?.sourceUrl).toBe('https://au.brand.test/pages/sale');
+  });
+
+  it('selects maximum discount when observations share the same host authority tier', () => {
+    const result = buildComparison([
+      {
+        subjectId: OWNED_ID,
+        sources: [
+          source('homepage', [
+            observation('offer.discount', { type: 'percentage', amount: 25 }, '2026-09-01T12:00:00.000Z', 'snap-1', 'https://brand.test/'),
+          ], 'source-home'),
+          source('pricing_offers', [
+            observation('offer.discount', { type: 'percentage', amount: 39 }, '2026-09-01T12:00:00.000Z', 'snap-2', 'https://brand.test/pages/sale'),
+          ], 'source-sale'),
+        ],
+      },
+    ]);
+
+    const fact = factKey(result, 'offer.discount:percentage');
+    expect(fact).toBeDefined();
+    expect(fact?.valuesBySubjectId[OWNED_ID]?.value).toEqual({ type: 'percentage', amount: 39 });
+    expect(fact?.valuesBySubjectId[OWNED_ID]?.provenance?.sourceUrl).toBe('https://brand.test/pages/sale');
+  });
+
+  it('applies host authority tiers to competitors and tracks exact provenance in comparison deltas', () => {
+    const result = buildComparison([
+      {
+        subjectId: OWNED_ID,
+        sources: [
+          source('pricing_offers', [
+            observation('offer.discount', { type: 'percentage', amount: 39 }, '2026-09-01T12:00:00.000Z', 'snap-1', 'https://brand.test/sale'),
+          ], 'owned-primary'),
+          source('pricing_offers', [
+            observation('offer.discount', { type: 'percentage', amount: 42 }, '2026-09-01T12:00:00.000Z', 'snap-2', 'https://au.brand.test/sale'),
+          ], 'owned-subdomain'),
+        ],
+      },
+      {
+        subjectId: COMPETITOR_ID,
+        sources: [
+          source('pricing_offers', [
+            observation('offer.discount', { type: 'percentage', amount: 30 }, '2026-09-01T12:00:00.000Z', 'snap-3', 'https://rival.test/offers'),
+          ], 'comp-primary'),
+          source('pricing_offers', [
+            observation('offer.discount', { type: 'percentage', amount: 50 }, '2026-09-01T12:00:00.000Z', 'snap-4', 'https://au.rival.test/offers'),
+          ], 'comp-subdomain'),
+        ],
+      },
+    ]);
+
+    const fact = factKey(result, 'offer.discount:percentage');
+    expect(fact).toBeDefined();
+    expect(fact?.valuesBySubjectId[OWNED_ID]?.value).toEqual({ type: 'percentage', amount: 39 });
+    expect(fact?.valuesBySubjectId[OWNED_ID]?.provenance?.sourceUrl).toBe('https://brand.test/sale');
+    expect(fact?.valuesBySubjectId[COMPETITOR_ID]?.value).toEqual({ type: 'percentage', amount: 30 });
+    expect(fact?.valuesBySubjectId[COMPETITOR_ID]?.provenance?.sourceUrl).toBe('https://rival.test/offers');
+    expect(fact?.numericDeltas).toEqual([{
+      competitorSubjectId: COMPETITOR_ID,
+      ownedValue: 39,
+      competitorValue: 30,
+      difference: -9,
+      unit: 'percent',
+    }]);
+  });
 });
+
 
 describe('parseBrandComparisonRequest', () => {
   it('dedupes competitor ids and enforces max 5', () => {

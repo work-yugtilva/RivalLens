@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import type { EvidenceDrawerView } from '@/lib/overview/provenance-types';
 import type { ReportView } from '@/lib/overview/types';
 import { CompletenessNotice, GenerationNotice } from './completeness-notice';
@@ -17,14 +17,13 @@ export function OverviewReport({
   report,
   drawers,
   competitorIds,
-  regenerate,
 }: {
   report: ReportView;
   drawers: Record<string, EvidenceDrawerView>;
   competitorIds: string[];
-  regenerate: (formData: FormData) => Promise<void>;
 }) {
   const drawerId = useId();
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const selected = selectedKey === null ? null : (drawers[selectedKey] ?? null);
 
@@ -32,11 +31,7 @@ export function OverviewReport({
     <>
       {report.notice ? <CompletenessNotice notice={report.notice} /> : null}
       {report.generationNotice ? (
-        <GenerationNotice
-          notice={report.generationNotice}
-          competitorIds={competitorIds}
-          regenerate={regenerate}
-        />
+        <GenerationNotice notice={report.generationNotice} competitorIds={competitorIds} />
       ) : null}
 
       {report.insufficient ? (
@@ -51,7 +46,10 @@ export function OverviewReport({
               last={index === report.sections.length - 1}
               selectedKey={selectedKey}
               drawerId={drawerId}
-              onSelect={setSelectedKey}
+              onSelect={(key, trigger) => {
+                triggerRef.current = trigger;
+                setSelectedKey(key);
+              }}
             />
           ))}
         </div>
@@ -62,6 +60,7 @@ export function OverviewReport({
         drawerId={drawerId}
         open={selected !== null}
         onClose={() => setSelectedKey(null)}
+        returnFocus={() => triggerRef.current?.focus({ preventScroll: true })}
       />
     </>
   );

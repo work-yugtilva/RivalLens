@@ -136,8 +136,11 @@ function extractOfferFacts(input: ExtractionInput) {
   for (const match of text.matchAll(/(?:\$|€|£)\s*(\d+(?:\.\d{1,2})?)\s*(?:off|discount)\b/gi)) {
     addCandidate(input.candidates, candidate(input, 'offer.discount', { type: 'fixed', amount: Number(match[1]), text: match[0] }, 0.8));
   }
-  for (const match of text.matchAll(/(?:promo(?:tional)?|coupon)\s*code\s*[:-]?\s*([A-Z0-9-]{3,})|\bcode\s*[:-]\s*([A-Z0-9-]{3,})/gi)) {
-    addCandidate(input.candidates, candidate(input, 'offer.promo', { code: (match[1] || match[2]).toUpperCase(), text: match[0] }, 0.8));
+  for (const match of text.matchAll(/(?:(?:promo(?:tional)?|coupon)\s+code\b\s*(?:[:=-]\s*|\s+)(["']?)([A-Z0-9-]{3,})\1|\bcode\s*[:=-]\s*(["']?)([A-Z0-9-]{3,})\3)/gi)) {
+    const rawCode = (match[2] || match[4] || '').trim();
+    if (isValidPromoToken(rawCode)) {
+      addCandidate(input.candidates, candidate(input, 'offer.promo', { code: rawCode.toUpperCase(), text: match[0] }, 0.8));
+    }
   }
   for (const match of text.matchAll(/\b(?:buy\s+\d+\s+(?:and\s+)?get\s+\d+|buy\s+one\s+get\s+one)\b[^.!?]*/gi)) {
     addCandidate(input.candidates, candidate(input, 'offer.buy_x_get_y', { text: match[0].trim() }, 0.75));
@@ -155,13 +158,56 @@ function extractSubscriptionFacts(input: ExtractionInput) {
   const text = bodyText(input.$);
   const discount = text.match(/(?:subscribe\s*(?:&|and)\s*save|subscription)\D{0,40}?(\d{1,2})%\s*(?:off|save)/i);
   const frequency = text.match(/\b(?:every|delivered\s+every)\s+(\d+\s*(?:week|weeks|month|months))\b/i);
-  if (discount || frequency || /subscribe\s*(?:&|and)\s*save|subscription/i.test(text)) {
+  const hasNegative = hasNegatedSubscription(text);
+  const hasAffirmative = Boolean(
+    discount ||
+    frequency ||
+    /subscribe\s*(?:&|and)\s*save/i.test(text) ||
+    (/\bsubscription\b/i.test(text) && !hasNegative),
+  );
+
+  if (hasAffirmative) {
     addCandidate(input.candidates, candidate(input, 'subscription.details', {
       available: true,
       ...(discount ? { discountPercent: Number(discount[1]) } : {}),
       ...(frequency ? { frequency: frequency[1] } : {}),
     }, discount ? 0.8 : 0.75));
   }
+}
+
+const COMMON_WORDS_NOT_PROMO_CODES = new Set([
+  'EVERYTHING',
+  'CHECKOUT',
+  'DISCOUNT',
+  'DISCOUNTS',
+  'DETAILS',
+  'TERMS',
+  'APPLIED',
+  'ONLINE',
+  'STORE',
+  'SHIPPING',
+  'RETURN',
+  'RETURNS',
+  'EXCLUSIONS',
+  'REQUIRED',
+]);
+
+function isValidPromoToken(token: string): boolean {
+  if (!token || token.length < 3 || token.length > 30) return false;
+  const upper = token.toUpperCase();
+  if (COMMON_WORDS_NOT_PROMO_CODES.has(upper)) return false;
+  // If it is purely alphabetic, avoid standard dictionary words unless it has digits or hyphens or is explicitly formatted
+  return /^[A-Z0-9-]+$/i.test(token);
+}
+
+function hasNegatedSubscription(text: string): boolean {
+  return (
+    /\b(?:no|without|never|zero)\b(?:\s+\w+){0,3}\s+subscriptions?\b/i.test(text) ||
+    /\bsubscriptions?\b(?:\s+\w+){0,3}\s+(?:not\s+required|never\s+required|not\s+needed|not\s+necessary|optional|free|zero)\b/i.test(text) ||
+    /\bnever\s+requires?\s+(?:a\s+)?subscriptions?\b/i.test(text) ||
+    /\bnot\s+a\s+subscriptions?\b/i.test(text) ||
+    /\bno\s+subscription\s+(?:fee|charge|cost)s?\b/i.test(text)
+  );
 }
 
 function extractPolicyFacts(input: ExtractionInput) {
@@ -273,8 +319,10 @@ function availabilityValue(value: unknown) {
 }
 
 function bodyText($: ReturnType<typeof load>) {
-  $('script, style, noscript, template').remove();
-  return $('body').text().replace(/\s+/g, ' ').trim();
+  const body = $('body').clone();
+  body.find('script, style, noscript, template').remove();
+  body.find('h1, h2, h3, h4, h5, h6, p, div, li, tr, td, th, section, article, header, footer, button, a, blockquote, dt, dd, span').after(' ');
+  return body.text().replace(/\s+/g, ' ').trim();
 }
 
 function durationPayload(match: RegExpMatchArray) {

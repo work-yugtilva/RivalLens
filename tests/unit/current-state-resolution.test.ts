@@ -413,4 +413,46 @@ describe("mergeSubjectCurrentState authority", () => {
     expect(absent?.provenance.priorSnapshotId).toBe("11111111-1111-4111-8111-111111111111");
     expect(absent?.provenance.observedAt).toBe("2026-09-01T11:00:00.000Z");
   });
+
+  it("prefers configured primary domain over localized subdomains regardless of recency", () => {
+    function obsWithUrl(url: string, headline: string, observedAt: string, snapshotId: string): EvidenceObservation {
+      return {
+        id: `aaaaaaaa-bbbb-4ccc-8ddd-${String(++observationCounter).padStart(12, "0")}`,
+        factType: "positioning.homepage",
+        sourceUrl: url,
+        payload: { headline },
+        observedAt,
+        confidence: 0.9,
+        snapshotId,
+      };
+    }
+
+    const primarySource: SourceEvidence = {
+      sourceId: "11111111-1111-4111-8111-111111111111",
+      sourceType: "homepage",
+      snapshots: [
+        {
+          id: "snap-primary-1",
+          capturedAt: "2026-09-01T10:00:00.000Z",
+          observations: [obsWithUrl("https://ridge.com/", "Everyday Carry Redefined", "2026-09-01T10:00:00.000Z", "snap-primary-1")],
+        },
+      ],
+    };
+
+    const localizedSubdomainSource: SourceEvidence = {
+      sourceId: "22222222-2222-4222-8222-222222222222",
+      sourceType: "homepage",
+      snapshots: [
+        {
+          id: "snap-localized-2",
+          capturedAt: "2026-09-01T12:00:00.000Z",
+          observations: [obsWithUrl("https://uk.ridge.com/", "UK Favourite Minimalist Wallet", "2026-09-01T12:00:00.000Z", "snap-localized-2")],
+        },
+      ],
+    };
+
+    const merged = mergeSubjectCurrentState([primarySource, localizedSubdomainSource], "ridge.com");
+    expect(merged.get("positioning:homepage:headline")?.normalizedValue.headline).toBe("Everyday Carry Redefined");
+    expect(merged.get("positioning:homepage:headline")?.provenance.sourceUrl).toBe("https://ridge.com/");
+  });
 });

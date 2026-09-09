@@ -424,6 +424,31 @@ describe('detectCompetitiveSignals comparison rules', () => {
     expect(detect([...percentFacts(5, 10), ...percentFacts(15, 20)])).toEqual([]);
   });
 
+  it('detects percentage discount signal from unified offer.discount:percentage comparison fact', () => {
+    const unifiedFact: BrandComparisonResult['facts'] = [
+      {
+        key: 'offer.discount:percentage',
+        valuesBySubjectId: {
+          [OWNED_ID]: value('present', { type: 'percentage', amount: 10 }, 'owned'),
+          [COMPETITOR_ID]: value('present', { type: 'percentage', amount: 15 }, 'competitor'),
+        },
+      },
+    ];
+    const signals = detect(unifiedFact);
+    expect(signals).toHaveLength(1);
+    expect(signals[0]).toMatchObject({
+      signalType: 'competitor_higher_explicit_percentage_discount',
+      statement: "rival.test's explicit percentage discount is 5 percentage points higher than the owned brand's.",
+      supportingValues: {
+        owned: 10,
+        competitor: 15,
+        delta: 5,
+        unit: 'percentage_points',
+      },
+    });
+  });
+
+
   it('binds static discount keys to normalized payload type and amount', () => {
     const mismatchedPresence = {
       key: 'offer.discount:fixed:10',

@@ -369,7 +369,11 @@ function comparisonDiscountIdentityMatches(
 ): boolean {
   if (value?.state !== 'present') return true;
   const discount = normalizedDiscount(value);
-  return discount !== null && key === `offer.discount:${discount.type}:${discount.amount}`;
+  return (
+    discount !== null &&
+    (key === `offer.discount:${discount.type}` ||
+      key === `offer.discount:${discount.type}:${discount.amount}`)
+  );
 }
 
 function presenceDrafts(
@@ -594,7 +598,8 @@ function discountChangeIdentityMatches(
   return (
     discount !== null &&
     change.factType === 'offer.discount' &&
-    change.factIdentity === `offer:discount:${discount.type}:${discount.amount}`
+    (change.factIdentity === `offer:discount:${discount.type}` ||
+      change.factIdentity === `offer:discount:${discount.type}:${discount.amount}`)
   );
 }
 

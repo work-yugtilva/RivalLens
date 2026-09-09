@@ -27,7 +27,7 @@ export function ItemRow({
   /** Experiments carry more room on their inner edges. */
   variant?: 'default' | 'experiment';
   drawerId: string;
-  onSelect: () => void;
+  onSelect: (trigger: HTMLButtonElement) => void;
   children: React.ReactNode;
 }) {
   const experiment = variant === 'experiment';
@@ -35,14 +35,16 @@ export function ItemRow({
   return (
     <button
       type="button"
-      onClick={onSelect}
+      onClick={(event) => onSelect(event.currentTarget)}
+      data-report-row
       aria-expanded={selected}
       aria-controls={drawerId}
       className={cn(
-        'group flex w-full gap-3 rounded-md text-left transition-colors duration-100',
+        'group flex w-[calc(100%+32px)] tablet:w-[calc(100%+24px)] xl:w-[calc(100%+32px)] gap-3 rounded-md text-left transition-colors duration-100',
         '-mx-4 px-4 tablet:-mx-3 tablet:px-3 xl:-mx-4 xl:gap-[14px] xl:px-4',
         'hover:bg-rl-row-hover focus-visible:shadow-[inset_0_0_0_2px_var(--color-rl-indigo)] focus-visible:outline-none',
-        selected && 'bg-rl-row-selected shadow-[inset_2px_0_0_var(--color-rl-indigo)]',
+        selected &&
+          'bg-rl-row-selected shadow-[inset_2px_0_0_var(--color-rl-indigo)] [&_.text-rl-faint]:text-rl-muted',
         rowSpacing({ first, last, experiment }),
       )}
     >
@@ -67,7 +69,7 @@ function rowSpacing({
   experiment: boolean;
 }) {
   return cn(
-    first ? 'pt-[14px]' : 'border-t border-rl-rule-item pt-4 tablet:pt-[14px] xl:pt-4',
+    first ? 'pt-0 xl:pt-[14px]' : 'border-t border-rl-rule-item pt-4 tablet:pt-[14px] xl:pt-4',
     !first && experiment && 'xl:pt-[18px]',
     last ? 'pb-0 xl:pb-4' : 'pb-4 tablet:pb-[14px] xl:pb-4',
     !last && experiment && 'xl:pb-[18px]',
@@ -114,9 +116,7 @@ export function ItemList({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn(bleedTop && 'xl:-mt-[14px]', bleedBottom && 'xl:-mb-4')}>
-      {children}
-    </div>
+    <div className={cn(bleedTop && 'xl:-mt-[14px]', bleedBottom && 'xl:-mb-4')}>{children}</div>
   );
 }
 

@@ -167,28 +167,56 @@ export function resolveSourceCurrentState(source: SourceEvidence): Map<string, R
 
 type AuthoritativeCandidate = ResolvedFact & { sourceType: string };
 
+export function hostAuthorityRank(sourceUrl: string, primaryDomain?: string): number {
+  if (!primaryDomain) return 0;
+  const normalizedPrimary = primaryDomain.toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/\.$/, '');
+  const apexPrimary = normalizedPrimary.replace(/^www\./, '');
+
+  let sourceHostname = '';
+  try {
+    sourceHostname = new URL(sourceUrl).hostname.toLowerCase().replace(/\.$/, '');
+  } catch {
+    sourceHostname = sourceUrl.toLowerCase();
+  }
+
+  if (sourceHostname === normalizedPrimary) return 0;
+  if (sourceHostname === apexPrimary || sourceHostname === `www.${apexPrimary}`) return 1;
+  if (sourceHostname.endsWith(`.${apexPrimary}`)) return 2;
+  return 3;
+}
+
 function pickAuthoritativeCandidate(
   candidates: AuthoritativeCandidate[],
   factIdentity: string,
+  primaryDomain?: string,
 ): AuthoritativeCandidate | null {
   const authoritative = candidates.filter((candidate) =>
     isAuthoritativeSource(candidate.sourceType, factIdentity),
   );
   if (authoritative.length === 0) return null;
 
-  const bestRank = Math.min(...authoritative.map((candidate) =>
+  const bestSourceRank = Math.min(...authoritative.map((candidate) =>
     sourceAuthorityRank(candidate.sourceType, factIdentity),
   ));
-  const tier = authoritative.filter((candidate) =>
-    sourceAuthorityRank(candidate.sourceType, factIdentity) === bestRank,
+  const sourceTier = authoritative.filter((candidate) =>
+    sourceAuthorityRank(candidate.sourceType, factIdentity) === bestSourceRank,
   );
 
-  return tier.reduce((winner, candidate) =>
+  if (sourceTier.length === 1) return sourceTier[0];
+
+  const bestHostRank = Math.min(...sourceTier.map((candidate) =>
+    hostAuthorityRank(candidate.provenance.sourceUrl, primaryDomain),
+  ));
+  const hostTier = sourceTier.filter((candidate) =>
+    hostAuthorityRank(candidate.provenance.sourceUrl, primaryDomain) === bestHostRank,
+  );
+
+  return hostTier.reduce((winner, candidate) =>
     Date.parse(candidate.evaluatedAt) > Date.parse(winner.evaluatedAt) ? candidate : winner,
   );
 }
 
-export function mergeSubjectCurrentState(sources: SourceEvidence[]): Map<string, ResolvedFact> {
+export function mergeSubjectCurrentState(sources: SourceEvidence[], primaryDomain?: string): Map<string, ResolvedFact> {
   const candidatesByFact = new Map<string, AuthoritativeCandidate[]>();
 
   for (const source of sources) {
@@ -202,7 +230,7 @@ export function mergeSubjectCurrentState(sources: SourceEvidence[]): Map<string,
 
   const merged = new Map<string, ResolvedFact>();
   for (const [factIdentity, candidates] of candidatesByFact) {
-    const winner = pickAuthoritativeCandidate(candidates, factIdentity);
+    const winner = pickAuthoritativeCandidate(candidates, factIdentity, primaryDomain);
     if (!winner) continue;
     const { sourceType, ...fact } = winner;
     void sourceType;
@@ -222,9 +250,9 @@ function productUrlFromIdentity(factIdentity: string): string | null {
   return null;
 }
 
-export function resolveSubjectProductFacts(sources: SourceEvidence[]): SubjectProduct[] {
+export function resolveSubjectProductFacts(sources: SourceEvidence[], primaryDomain?: string): SubjectProduct[] {
   const productSources = sources.filter((source) => source.sourceType === "product");
-  const merged = mergeSubjectCurrentState(productSources);
+  const merged = mergeSubjectCurrentState(productSources, primaryDomain);
   const products = new Map<string, SubjectProduct>();
 
   for (const [factIdentity, fact] of merged) {

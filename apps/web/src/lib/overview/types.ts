@@ -92,7 +92,7 @@ export type SectionView = {
 };
 
 export type ReportStatusView = {
-  state: 'complete' | 'partial';
+  state: 'complete' | 'partial' | 'insufficient';
   label: string;
   competitorCountLabel: string;
   generatedLabel: string;
