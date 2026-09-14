@@ -52,6 +52,13 @@ export {
 } from './synthesis-prompt';
 
 export {
+  INTELLIGENCE_VALIDATOR_CONTRACT_VERSION,
+  prepareIntelligenceGenerationPersistence,
+  type IntelligencePersistenceRejectionCode,
+  type PrepareIntelligenceGenerationPersistenceResult,
+} from './persistence';
+
+export {
   validateIntelligenceSynthesis,
   type IndexedItemValidationResult,
   type IntelligenceValidationError,
