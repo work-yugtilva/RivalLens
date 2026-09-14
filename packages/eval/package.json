@@ -1,0 +1,14 @@
+{
+  "name": "@rivallens/eval",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@rivallens/ai": "workspace:*",
+    "@rivallens/intelligence": "workspace:*",
+    "@rivallens/schemas": "workspace:*",
+    "zod": "^3.25.76"
+  }
+}

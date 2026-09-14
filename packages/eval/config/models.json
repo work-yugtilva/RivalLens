@@ -1,0 +1,88 @@
+{
+  "configVersion": "phase-4b-models-v1",
+  "note": "Trusted benchmark model allowlist. --models selects by `alias` ONLY — never provider:modelId, never an arbitrary model id or base URL. Model IDs, endpoints, capability flags and pricing were verified 2026-09-09 against first-party provider documentation (see packages/eval/README.md for the source list). `supportedReasoningEfforts` is the machine-checkable set the CLI --reasoning-effort override is validated against before any provider is constructed.",
+  "models": [
+    {
+      "alias": "mock",
+      "providerId": "deterministic-mock",
+      "modelId": "phase-3a",
+      "temperature": 0,
+      "maxOutputTokens": 2048,
+      "runsPerFixture": 1
+    },
+    {
+      "alias": "openai-terra",
+      "providerId": "openai",
+      "modelId": "gpt-5.6-terra",
+      "maxOutputTokens": 32768,
+      "runsPerFixture": 3,
+      "temperatureSupported": false,
+      "structuredOutputMode": "strict_json_schema",
+      "supportedReasoningEfforts": ["low", "medium", "high"]
+    },
+    {
+      "alias": "anthropic-sonnet",
+      "providerId": "anthropic",
+      "modelId": "claude-sonnet-4-6",
+      "maxOutputTokens": 32768,
+      "runsPerFixture": 3,
+      "temperatureSupported": false,
+      "structuredOutputMode": "json_object",
+      "timeoutMs": 120000,
+      "supportedReasoningEfforts": ["low", "medium", "high"]
+    },
+    {
+      "alias": "gemini-flash",
+      "providerId": "gemini",
+      "modelId": "gemini-3.8-flash",
+      "maxOutputTokens": 32768,
+      "runsPerFixture": 3,
+      "temperatureSupported": false,
+      "structuredOutputMode": "json_object",
+      "supportedReasoningEfforts": ["low", "medium", "high"]
+    },
+    {
+      "alias": "deepseek-flagship",
+      "providerId": "deepseek",
+      "modelId": "deepseek-v4-pro",
+      "maxOutputTokens": 32768,
+      "runsPerFixture": 3,
+      "temperatureSupported": false,
+      "structuredOutputMode": "json_object",
+      "supportedReasoningEfforts": ["low", "high"]
+    },
+    {
+      "alias": "kimi-flagship",
+      "providerId": "kimi",
+      "modelId": "kimi-k3",
+      "temperature": 0,
+      "maxOutputTokens": 32768,
+      "runsPerFixture": 3,
+      "temperatureSupported": true,
+      "structuredOutputMode": "json_object",
+      "supportedReasoningEfforts": []
+    },
+    {
+      "alias": "glm-flagship",
+      "providerId": "glm",
+      "modelId": "glm-5.3",
+      "temperature": 0,
+      "maxOutputTokens": 32768,
+      "runsPerFixture": 3,
+      "temperatureSupported": true,
+      "structuredOutputMode": "json_object",
+      "supportedReasoningEfforts": ["low", "medium", "high"]
+    },
+    {
+      "alias": "qwen-flagship",
+      "providerId": "qwen",
+      "modelId": "qwen3.8-max-0902",
+      "temperature": 0,
+      "maxOutputTokens": 16384,
+      "runsPerFixture": 3,
+      "temperatureSupported": true,
+      "structuredOutputMode": "json_object",
+      "supportedReasoningEfforts": []
+    }
+  ]
+}

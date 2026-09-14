@@ -47,6 +47,11 @@ export {
 } from './context';
 
 export {
+  INTELLIGENCE_SYNTHESIS_PROMPT_VERSION,
+  INTELLIGENCE_SYNTHESIS_SYSTEM_PROMPT,
+} from './synthesis-prompt';
+
+export {
   validateIntelligenceSynthesis,
   type IndexedItemValidationResult,
   type IntelligenceValidationError,

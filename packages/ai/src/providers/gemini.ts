@@ -1,10 +1,6 @@
 import { ApiError, GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { z } from 'zod';
-import {
-  deduplicateGeminiTransportSchema,
-  projectToGeminiTransportSchema,
-  zodToGeminiCandidateSchema,
-} from './gemini-schema-projection';
+import { buildGeminiOutputFormatInstruction } from './gemini-format-instruction';
 import {
   elapsedMs,
   normalizeParameters,
@@ -110,11 +106,8 @@ export class GeminiIntelligenceProvider implements IntelligenceModelProvider {
         model: this.modelId,
         contents: serializeRequestContext(request),
         config: {
-          systemInstruction: request.systemPrompt,
+          systemInstruction: `${request.systemPrompt}${buildGeminiOutputFormatInstruction(request.responseSchema)}`,
           responseMimeType: 'application/json',
-          responseJsonSchema: deduplicateGeminiTransportSchema(
-            projectToGeminiTransportSchema(zodToGeminiCandidateSchema(request.responseSchema)),
-          ),
           maxOutputTokens: parameters.maxOutputTokens,
           ...(parameters.temperature === undefined ? {} : { temperature: parameters.temperature }),
           ...(parameters.reasoningEffort === undefined

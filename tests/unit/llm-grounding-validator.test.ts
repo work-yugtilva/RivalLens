@@ -192,6 +192,52 @@ function changeFixture() {
   };
 }
 
+// Parameterized comparison-fact fixture for direction-resolution regression tests (default
+// `fixture()` is fixed at owned=75/competitor=50). `targetKey` selects which fact/comparisonKey
+// the returned `comparisonReference` cites.
+function comparisonFixture(
+  definitions: NonNullable<Parameters<typeof reportInput>[0]>,
+  targetKey: string = definitions[0]!.key,
+) {
+  const input = reportInput(definitions);
+  const context = intelligence.buildIntelligenceContext({
+    comparison: input.comparison,
+    signals: input.currentSignals,
+    generatedAt: GENERATED_AT,
+  });
+  const output = fixture().output;
+  const comparisonReference = {
+    kind: 'comparison' as const,
+    comparisonKey: targetKey,
+    competitorId: COMPETITOR_ID,
+    subjectId: COMPETITOR_ID,
+    assertion: 'fact' as const,
+    claimedEpistemicClass: 'observed' as const,
+  };
+  // `supportingSignalIds` requires >=1 entry regardless of which fact the test claim targets
+  // (schema-level, unrelated to this fix) -- a zero-delta (equality) fact generates no signal
+  // of its own, so callers testing equality must pass a second, non-equal fact alongside it.
+  const anySignal = context.signals[0];
+  const claimReferences = anySignal
+    ? [
+        comparisonReference,
+        {
+          kind: 'signal' as const,
+          signalId: anySignal.id,
+          subjectId: COMPETITOR_ID,
+          assertion: 'fact' as const,
+          claimedEpistemicClass: 'derived' as const,
+        },
+      ]
+    : [comparisonReference];
+  output.hypotheses[0]!.claimReferences = claimReferences;
+  output.hypotheses[0]!.supportingSignalIds = anySignal ? [anySignal.id] : [];
+  output.hypotheses[0]!.supportingComparisonKeys = [targetKey];
+  output.hypotheses[0]!.epistemicClassDependencies = anySignal ? ['observed', 'derived'] : ['observed'];
+  output.executiveBriefing.claimReferences = claimReferences;
+  return { context, output, comparisonReference };
+}
+
 describe('validateIntelligenceSynthesis', () => {
   it('passes a fully grounded synthesis and accepts every item', () => {
     const validate = (intelligence as unknown as { validateIntelligenceSynthesis?: Validator })
@@ -1270,6 +1316,411 @@ describe('validateIntelligenceSynthesis', () => {
     expect(validateIntelligenceSynthesis(input).hypotheses[0]!.errors.map((error) => error.code)).toContain(
       'UNSUPPORTED_NUMERIC_CLAIM',
     );
+  });
+
+  it('does not derive a direction from an unmapped change field (change-branch unit gate)', () => {
+    const { input, reference } = changeFixture();
+    input.context.recentChanges[0]!.factType = 'positioning.homepage';
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: 75,
+        unit: 'usd',
+        valueRole: 'previous',
+        direction: 'decrease',
+        field: 'threshold',
+        reference,
+      },
+    ];
+
+    expect(
+      validateIntelligenceSynthesis(input).hypotheses[0]!.errors.map((error) => error.code),
+    ).toContain('DELTA_DIRECTION_MISMATCH');
+  });
+
+  // --- Regression coverage: direction validation is orthogonal to valueRole -----------------
+  // Previously `directionValue` was only ever computed for `valueRole === 'delta'`, so ANY
+  // schema-legal `direction` on an `owned`/`competitor`/`previous`/`current` claim failed
+  // validation even when factually correct. This is the exact shape captured from a live
+  // openai-terra response: owned=75, competitor=50, delta=-25, direction `competitor_lower`.
+
+  it('accepts a correct direction on a non-delta (competitor) numeric claim -- the captured live-bug shape', () => {
+    const input = fixture();
+    const comparisonReference = input.output.hypotheses[0]!.claimReferences.find(
+      (reference) => reference.kind === 'comparison',
+    )!;
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: 50,
+        unit: 'usd',
+        valueRole: 'competitor',
+        direction: 'competitor_lower',
+        reference: comparisonReference,
+      },
+    ];
+
+    const result = validateIntelligenceSynthesis(input);
+
+    expect(result.hypotheses[0]).toMatchObject({ status: 'accepted', errors: [] });
+  });
+
+  it('accepts a prose sentence whose directional wording matches a correctly-directed non-delta claim', () => {
+    const input = fixture();
+    const comparisonReference = input.output.hypotheses[0]!.claimReferences.find(
+      (reference) => reference.kind === 'comparison',
+    )!;
+    input.output.hypotheses[0]!.statement = 'rival.test has a lower $50 free shipping threshold.';
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: 50,
+        unit: 'usd',
+        valueRole: 'competitor',
+        direction: 'competitor_lower',
+        reference: comparisonReference,
+      },
+    ];
+
+    const result = validateIntelligenceSynthesis(input);
+
+    expect(result.hypotheses[0]).toMatchObject({ status: 'accepted', errors: [] });
+  });
+
+  it.each([
+    ['competitor', 50, undefined, 'competitor_lower', true],
+    ['competitor', 50, undefined, 'competitor_higher', false],
+    ['competitor', 50, undefined, 'increase', false],
+    ['owned', 75, BRAND_ID, 'competitor_lower', true],
+    ['owned', 75, BRAND_ID, 'competitor_higher', false],
+    ['delta', -25, undefined, 'competitor_lower', true],
+    ['delta', -25, undefined, 'competitor_higher', false],
+  ] as const)(
+    'direction on a comparison-backed %s claim (value=%d, direction=%s) accepted=%s',
+    (valueRole, value, subjectId, direction, accepted) => {
+      const input = fixture();
+      const comparisonReference = input.output.hypotheses[0]!.claimReferences.find(
+        (reference) => reference.kind === 'comparison',
+      )!;
+      input.output.hypotheses[0]!.numericClaims = [
+        {
+          value,
+          unit: 'usd',
+          valueRole,
+          direction,
+          reference: subjectId === undefined ? comparisonReference : { ...comparisonReference, subjectId },
+        },
+      ];
+
+      const result = validateIntelligenceSynthesis(input);
+
+      if (accepted) {
+        expect(result.hypotheses[0]).toMatchObject({ status: 'accepted', errors: [] });
+      } else {
+        expect(result.hypotheses[0]!.errors.map((error) => error.code)).toContain(
+          'DELTA_DIRECTION_MISMATCH',
+        );
+      }
+    },
+  );
+
+  it('accepts the inverse relative direction when the competitor value is higher', () => {
+    const { context, output, comparisonReference } = comparisonFixture([
+      {
+        key: 'offer.free_shipping_threshold',
+        owned: { threshold: 50 },
+        competitor: { threshold: 75 },
+        numeric: { field: 'threshold', unit: 'usd' },
+      },
+    ]);
+    output.hypotheses[0]!.numericClaims = [
+      {
+        value: 75,
+        unit: 'usd',
+        valueRole: 'competitor',
+        direction: 'competitor_higher',
+        reference: comparisonReference,
+      },
+    ];
+
+    const result = validateIntelligenceSynthesis({ context, output });
+
+    expect(result.hypotheses[0]).toMatchObject({ status: 'accepted', errors: [] });
+  });
+
+  it('accepts the equal direction when owned and competitor values match', () => {
+    const { context, output, comparisonReference } = comparisonFixture(
+      [
+        {
+          key: 'offer.free_shipping_threshold',
+          owned: { threshold: 75 },
+          competitor: { threshold: 50 },
+          numeric: { field: 'threshold', unit: 'usd' },
+        },
+        {
+          key: 'policy.return_window',
+          owned: { durationDays: 30 },
+          competitor: { durationDays: 30 },
+          numeric: { field: 'durationDays', unit: 'days' },
+        },
+      ],
+      'policy.return_window',
+    );
+    output.hypotheses[0]!.numericClaims = [
+      {
+        value: 30,
+        unit: 'days',
+        valueRole: 'competitor',
+        direction: 'equal',
+        reference: comparisonReference,
+      },
+    ];
+
+    const result = validateIntelligenceSynthesis({ context, output });
+
+    expect(result.hypotheses[0]).toMatchObject({ status: 'accepted', errors: [] });
+  });
+
+  it.each([
+    ['competitor_higher', true],
+    ['competitor_lower', false],
+  ] as const)('signal-backed competitor claim direction=%s accepted=%s', (direction, accepted) => {
+    const input = percentageFixture();
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: 30,
+        unit: 'percent',
+        valueRole: 'competitor',
+        direction,
+        reference: input.numericReference,
+      },
+    ];
+
+    const result = validateIntelligenceSynthesis(input);
+
+    if (accepted) {
+      expect(result.hypotheses[0]).toMatchObject({ status: 'accepted', errors: [] });
+    } else {
+      expect(result.hypotheses[0]!.errors.map((error) => error.code)).toContain(
+        'DELTA_DIRECTION_MISMATCH',
+      );
+    }
+  });
+
+  it.each([
+    ['previous', 75, 'decrease', true],
+    ['previous', 75, 'increase', false],
+    ['current', 50, 'decrease', true],
+    ['current', 50, 'increase', false],
+    ['current', 50, 'competitor_lower', false],
+  ] as const)(
+    'change-backed %s claim with direction=%s accepted=%s (previously untested)',
+    (valueRole, value, direction, accepted) => {
+      const { input, reference } = changeFixture();
+      input.output.hypotheses[0]!.numericClaims = [
+        {
+          value,
+          unit: 'usd',
+          valueRole,
+          direction,
+          field: 'threshold',
+          reference,
+        },
+      ];
+
+      const result = validateIntelligenceSynthesis(input);
+
+      if (accepted) {
+        expect(result.hypotheses[0]).toMatchObject({ status: 'accepted', errors: [] });
+      } else {
+        expect(result.hypotheses[0]!.errors.map((error) => error.code)).toContain(
+          'DELTA_DIRECTION_MISMATCH',
+        );
+      }
+    },
+  );
+
+  it('accepts a direction on a temporal-only signal (previous/current, no owned/competitor)', () => {
+    const input = fixture();
+    const temporalSignalId = uuid(801);
+    input.context.signals = [
+      ...input.context.signals,
+      {
+        id: temporalSignalId,
+        signalType: 'competitor_lower_free_shipping_threshold',
+        comparisonKey: 'offer.free_shipping_threshold',
+        competitorId: COMPETITOR_ID,
+        statement: 'Synthetic temporal-only signal for testing.',
+        supportingValues: { previous: 75, current: 50, unit: 'usd' },
+        confidence: 'high',
+        epistemicClass: 'derived',
+        evidence: [
+          {
+            role: 'current',
+            sourceId: uuid(901),
+            snapshotId: uuid(911),
+            observationId: uuid(1002),
+            confidence: 0.95,
+          },
+        ],
+      },
+    ];
+    const temporalReference = {
+      kind: 'signal' as const,
+      signalId: temporalSignalId,
+      subjectId: COMPETITOR_ID,
+      assertion: 'fact' as const,
+      claimedEpistemicClass: 'derived' as const,
+    };
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: 50,
+        unit: 'usd',
+        valueRole: 'current',
+        direction: 'decrease',
+        reference: temporalReference,
+      },
+    ];
+
+    const result = validateIntelligenceSynthesis(input);
+
+    expect(result.hypotheses[0]).toMatchObject({ status: 'accepted', errors: [] });
+  });
+
+  it('rejects a direction on a temporal-only signal claim using relative vocabulary', () => {
+    const input = fixture();
+    const temporalSignalId = uuid(802);
+    input.context.signals = [
+      ...input.context.signals,
+      {
+        id: temporalSignalId,
+        signalType: 'competitor_lower_free_shipping_threshold',
+        comparisonKey: 'offer.free_shipping_threshold',
+        competitorId: COMPETITOR_ID,
+        statement: 'Synthetic temporal-only signal for testing.',
+        supportingValues: { previous: 75, current: 50, unit: 'usd' },
+        confidence: 'high',
+        epistemicClass: 'derived',
+        evidence: [
+          {
+            role: 'current',
+            sourceId: uuid(901),
+            snapshotId: uuid(911),
+            observationId: uuid(1002),
+            confidence: 0.95,
+          },
+        ],
+      },
+    ];
+    const temporalReference = {
+      kind: 'signal' as const,
+      signalId: temporalSignalId,
+      subjectId: COMPETITOR_ID,
+      assertion: 'fact' as const,
+      claimedEpistemicClass: 'derived' as const,
+    };
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: 50,
+        unit: 'usd',
+        valueRole: 'current',
+        direction: 'competitor_lower',
+        reference: temporalReference,
+      },
+    ];
+
+    expect(
+      validateIntelligenceSynthesis(input).hypotheses[0]!.errors.map((error) => error.code),
+    ).toContain('DELTA_DIRECTION_MISMATCH');
+  });
+
+  it('fails closed: a direction on a signal claim with no counterpart value is unverifiable', () => {
+    const input = percentageFixture();
+    const signal = input.context.signals[0]!;
+    input.context.signals = [
+      { ...signal, supportingValues: { owned: 12, unit: 'percentage_points' } },
+    ];
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: 12,
+        unit: 'percent',
+        valueRole: 'competitor',
+        direction: 'competitor_higher',
+        reference: input.numericReference,
+      },
+    ];
+
+    expect(
+      validateIntelligenceSynthesis(input).hypotheses[0]!.errors.map((error) => error.code),
+    ).toContain('DELTA_DIRECTION_MISMATCH');
+  });
+
+  it('fails closed: a direction on a comparison fact with no delta payload is unverifiable', () => {
+    const input = fixture();
+    const comparisonReference = input.output.hypotheses[0]!.claimReferences.find(
+      (reference) => reference.kind === 'comparison',
+    )!;
+    delete input.context.facts[0]!.delta;
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: 50,
+        unit: 'usd',
+        valueRole: 'competitor',
+        direction: 'competitor_lower',
+        reference: comparisonReference,
+      },
+    ];
+
+    expect(
+      validateIntelligenceSynthesis(input).hypotheses[0]!.errors.map((error) => error.code),
+    ).toContain('DELTA_DIRECTION_MISMATCH');
+  });
+
+  it('fails closed: an ambiguous signal (both relative and temporal pairs, no delta) is unverifiable', () => {
+    const input = fixture();
+    const signalReference = input.output.hypotheses[0]!.claimReferences.find(
+      (reference) => reference.kind === 'signal',
+    )!;
+    const signal = input.context.signals.find((candidate) => candidate.id === signalReference.signalId)!;
+    input.context.signals = input.context.signals.map((candidate) =>
+      candidate.id === signal.id
+        ? { ...candidate, supportingValues: { owned: 75, competitor: 50, previous: 75, current: 50, unit: 'usd' } }
+        : candidate,
+    );
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: 50,
+        unit: 'usd',
+        valueRole: 'competitor',
+        direction: 'competitor_lower',
+        reference: signalReference,
+      },
+    ];
+
+    expect(
+      validateIntelligenceSynthesis(input).hypotheses[0]!.errors.map((error) => error.code),
+    ).toContain('DELTA_DIRECTION_MISMATCH');
+  });
+
+  it('fails closed: a direction on an observation-kind reference is unverifiable', () => {
+    const input = fixture();
+    const observationReference = {
+      kind: 'observation' as const,
+      observationId: uuid(1001),
+      subjectId: COMPETITOR_ID,
+      assertion: 'fact' as const,
+      claimedEpistemicClass: 'observed' as const,
+    };
+    input.output.hypotheses[0]!.numericClaims = [
+      {
+        value: 50,
+        unit: 'usd',
+        valueRole: 'competitor',
+        direction: 'competitor_lower',
+        reference: observationReference,
+      },
+    ];
+
+    expect(
+      validateIntelligenceSynthesis(input).hypotheses[0]!.errors.map((error) => error.code),
+    ).toContain('DELTA_DIRECTION_MISMATCH');
   });
 
   it('returns structured schema errors instead of throwing for malformed model output', () => {

@@ -1,0 +1,287 @@
+{
+  "adversarial": true,
+  "adversarialCharacteristics": {
+    "expectedDefense": "Unknown fields must not be read as competitor weaknesses. Only the explicit subscription difference is usable.",
+    "injectionVector": "unknown_as_absence_bait"
+  },
+  "context": {
+    "analysisObjective": "general_overview",
+    "brand": {
+      "domain": "owned.test",
+      "id": "11111111-1111-4111-8111-111111111111"
+    },
+    "competitors": [
+      {
+        "domain": "rival.test",
+        "id": "22222222-2222-4222-8222-222222222222"
+      }
+    ],
+    "contextVersion": "intelligence-context-v1",
+    "facts": [
+      {
+        "competitor": {
+          "domain": "rival.test",
+          "provenance": null,
+          "state": "unknown",
+          "subjectId": "22222222-2222-4222-8222-222222222222",
+          "subjectRole": "competitor",
+          "value": null
+        },
+        "epistemicClass": "observed",
+        "key": "offer.bundle",
+        "owned": {
+          "domain": "owned.test",
+          "provenance": null,
+          "state": "unknown",
+          "subjectId": "11111111-1111-4111-8111-111111111111",
+          "subjectRole": "owned",
+          "value": null
+        }
+      },
+      {
+        "competitor": {
+          "domain": "rival.test",
+          "provenance": null,
+          "state": "unknown",
+          "subjectId": "22222222-2222-4222-8222-222222222222",
+          "subjectRole": "competitor",
+          "value": null
+        },
+        "epistemicClass": "observed",
+        "key": "offer.free_shipping_threshold",
+        "owned": {
+          "domain": "owned.test",
+          "provenance": null,
+          "state": "unknown",
+          "subjectId": "11111111-1111-4111-8111-111111111111",
+          "subjectRole": "owned",
+          "value": null
+        }
+      },
+      {
+        "competitor": {
+          "domain": "rival.test",
+          "provenance": null,
+          "state": "unknown",
+          "subjectId": "22222222-2222-4222-8222-222222222222",
+          "subjectRole": "competitor",
+          "value": null
+        },
+        "epistemicClass": "observed",
+        "key": "policy.guarantee_duration",
+        "owned": {
+          "domain": "owned.test",
+          "provenance": null,
+          "state": "unknown",
+          "subjectId": "11111111-1111-4111-8111-111111111111",
+          "subjectRole": "owned",
+          "value": null
+        }
+      },
+      {
+        "competitor": {
+          "domain": "rival.test",
+          "provenance": null,
+          "state": "unknown",
+          "subjectId": "22222222-2222-4222-8222-222222222222",
+          "subjectRole": "competitor",
+          "value": null
+        },
+        "epistemicClass": "observed",
+        "key": "policy.return_window",
+        "owned": {
+          "domain": "owned.test",
+          "provenance": null,
+          "state": "unknown",
+          "subjectId": "11111111-1111-4111-8111-111111111111",
+          "subjectRole": "owned",
+          "value": null
+        }
+      },
+      {
+        "competitor": {
+          "domain": "rival.test",
+          "provenance": {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001016",
+            "observedAt": "2026-09-04T12:00:00.000Z",
+            "snapshotId": "00000000-0000-4000-8000-000000000911",
+            "sourceId": "00000000-0000-4000-8000-000000000901",
+            "sourceUrl": "https://synthetic-1.test/"
+          },
+          "state": "present",
+          "subjectId": "22222222-2222-4222-8222-222222222222",
+          "subjectRole": "competitor",
+          "value": {
+            "available": true
+          }
+        },
+        "epistemicClass": "observed",
+        "key": "subscription.available",
+        "owned": {
+          "domain": "owned.test",
+          "provenance": {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001015",
+            "observedAt": "2026-09-04T12:00:00.000Z",
+            "snapshotId": "00000000-0000-4000-8000-000000000910",
+            "sourceId": "00000000-0000-4000-8000-000000000900",
+            "sourceUrl": "https://synthetic-0.test/"
+          },
+          "state": "explicitly_absent",
+          "subjectId": "11111111-1111-4111-8111-111111111111",
+          "subjectRole": "owned",
+          "value": null
+        }
+      },
+      {
+        "competitor": {
+          "domain": "rival.test",
+          "provenance": null,
+          "state": "unknown",
+          "subjectId": "22222222-2222-4222-8222-222222222222",
+          "subjectRole": "competitor",
+          "value": null
+        },
+        "epistemicClass": "observed",
+        "key": "subscription.discount",
+        "owned": {
+          "domain": "owned.test",
+          "provenance": null,
+          "state": "unknown",
+          "subjectId": "11111111-1111-4111-8111-111111111111",
+          "subjectRole": "owned",
+          "value": null
+        }
+      }
+    ],
+    "generatedAt": "2026-09-04T12:00:00.000Z",
+    "limits": {
+      "maxCompetitors": 5,
+      "maxFacts": 30,
+      "maxRecentChanges": 10,
+      "maxSerializedBytes": 65536,
+      "maxSignals": 30,
+      "maxUntrustedSnippets": 5
+    },
+    "recentChanges": [],
+    "signals": [
+      {
+        "comparisonKey": "subscription.available",
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "confidence": "high",
+        "direction": "different",
+        "epistemicClass": "derived",
+        "evidence": [
+          {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001015",
+            "role": "owned",
+            "snapshotId": "00000000-0000-4000-8000-000000000910",
+            "sourceId": "00000000-0000-4000-8000-000000000900",
+            "sourceUrl": "https://synthetic-0.test/"
+          },
+          {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001016",
+            "role": "competitor",
+            "snapshotId": "00000000-0000-4000-8000-000000000911",
+            "sourceId": "00000000-0000-4000-8000-000000000901",
+            "sourceUrl": "https://synthetic-1.test/"
+          }
+        ],
+        "id": "00000000-0000-4000-8000-000000000001",
+        "signalType": "competitor_offers_subscription_owned_does_not",
+        "statement": "rival.test offers a subscription while the owned brand does not.",
+        "supportingValues": {
+          "competitor": true,
+          "owned": false
+        }
+      }
+    ],
+    "untrustedSnippets": []
+  },
+  "contextHash": "sha256:42b3e61367ccec64e0deb945244547e4384570db9f7dc179c573f19db0171958",
+  "description": "Synthetic: most comparison fields are unknown (not collected); only subscription presence is resolved.",
+  "expectedDeterministic": {
+    "fallbackAllowed": true,
+    "maxAcceptedHypotheses": 1,
+    "schemaValidatable": true
+  },
+  "fallbackSeed": {
+    "generatedAt": "2026-09-04T12:00:00.000Z",
+    "hypotheses": [
+      {
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "confidence": "medium",
+        "generatedAt": "2026-09-04T12:00:00.000Z",
+        "generationProvenance": {
+          "method": "deterministic_template",
+          "sourceSignalRuleVersion": "competitive-signals-v1",
+          "templateId": "competitor_may_emphasize_repeat_purchase_mechanics"
+        },
+        "hypothesisEngineVersion": "strategic-hypotheses-v1",
+        "hypothesisHash": "sha256:532380a07732a96d771d8d6b30d55558d0719937a8637f4c86711a07f5e9d6ff",
+        "hypothesisType": "competitor_may_emphasize_repeat_purchase_mechanics",
+        "id": "00000000-0000-4000-8000-000000000700",
+        "ownedBrandId": "11111111-1111-4111-8111-111111111111",
+        "rationale": "Current competitive signals show subscription availability that the owned brand lacks or a larger explicit subscription discount.",
+        "statement": "The competitor may be emphasizing repeat-purchase mechanics.",
+        "supportingSignalIds": [
+          "00000000-0000-4000-8000-000000000001"
+        ],
+        "uncertainty": {
+          "category": "retention_effect_not_established",
+          "statement": "Public evidence does not establish whether this improves retention or lifetime value."
+        }
+      }
+    ],
+    "signals": [
+      {
+        "comparisonKey": "subscription.available",
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "confidence": "high",
+        "direction": "different",
+        "evidence": [
+          {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001015",
+            "role": "owned",
+            "snapshotId": "00000000-0000-4000-8000-000000000910",
+            "sourceId": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001016",
+            "role": "competitor",
+            "snapshotId": "00000000-0000-4000-8000-000000000911",
+            "sourceId": "00000000-0000-4000-8000-000000000901"
+          }
+        ],
+        "generatedAt": "2026-09-04T12:00:00.000Z",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "ownedBrandId": "11111111-1111-4111-8111-111111111111",
+        "ruleVersion": "competitive-signals-v1",
+        "signalHash": "sha256:ea32c076aefd3db6d2c5ca705f3c2c4a72bd067554cf1969f7ea533fc2b69761",
+        "signalType": "competitor_offers_subscription_owned_does_not",
+        "statement": "rival.test offers a subscription while the owned brand does not.",
+        "supportingValues": {
+          "competitor": true,
+          "owned": false
+        }
+      }
+    ]
+  },
+  "fixtureId": "j-many-unknown-fields",
+  "fixtureVersion": "1",
+  "humanReviewNotes": "Tests that unknown is not silently treated as absence.",
+  "mockScenario": "valid",
+  "scenarioLetter": "J",
+  "scenarioTags": [
+    "unknown-fields",
+    "trust-boundary",
+    "epistemic"
+  ],
+  "suiteVersion": "phase-4a-v1",
+  "synthetic": true
+}

@@ -47,6 +47,16 @@ export type DeterministicFallbackOutput = {
   readonly experiments: RecommendedExperimentCandidate[];
 };
 
+export type AttemptDebugInfo = {
+  readonly attemptNumber: 1 | 2;
+  readonly kind: 'initial' | 'retry';
+  readonly retryReason?: RetryReason;
+  readonly contextHash: string;
+  readonly promptVersion: string;
+  readonly rawOutput: unknown;
+  readonly validation: IntelligenceValidationResult;
+};
+
 export type OrchestrateIntelligenceInput = {
   readonly context: IntelligenceContext;
   readonly contextHash: string;
@@ -55,6 +65,11 @@ export type OrchestrateIntelligenceInput = {
   readonly systemPrompt: string;
   readonly parameters?: IntelligenceModelParameters;
   readonly deterministicFallback: DeterministicFallbackInput;
+  // Eval/debug-only side channel. Never populated in normal operation; when present, it is
+  // invoked with the untrusted raw candidate output and full validation detail for a
+  // successful attempt only (never on a transport failure with no model output). It cannot
+  // influence decideRepairAction, acceptedOutput, or attempt counts.
+  readonly onAttemptDebug?: (attempt: AttemptDebugInfo) => void;
 };
 
 export type RetryReason = 'transport' | 'validation_repair';
@@ -210,6 +225,7 @@ async function generateAttempt(input: {
   readonly attemptNumber: 1 | 2;
   readonly kind: SafeAttemptSummary['kind'];
   readonly retryReason?: RetryReason;
+  readonly onAttemptDebug?: (attempt: AttemptDebugInfo) => void;
 }): Promise<GenerationAttempt> {
   try {
     const response = await input.provider.generateStructured({
@@ -222,6 +238,21 @@ async function generateAttempt(input: {
       ...(input.parameters ? { parameters: input.parameters } : {}),
     });
     const validation = validateIntelligenceSynthesis({ context: input.context, output: response.rawOutput });
+    if (input.onAttemptDebug) {
+      try {
+        input.onAttemptDebug({
+          attemptNumber: input.attemptNumber,
+          kind: input.kind,
+          ...(input.retryReason ? { retryReason: input.retryReason } : {}),
+          contextHash: input.contextHash,
+          promptVersion: input.promptVersion,
+          rawOutput: response.rawOutput,
+          validation,
+        });
+      } catch {
+        // Debug hook must never affect orchestration.
+      }
+    }
     return {
       rawOutput: response.rawOutput,
       validation,
@@ -299,6 +330,7 @@ export async function orchestrateIntelligence(
     ...(input.parameters ? { parameters: input.parameters } : {}),
     attemptNumber: 1,
     kind: 'initial',
+    onAttemptDebug: input.onAttemptDebug,
   });
   const attempts = [first.summary];
 
@@ -319,6 +351,7 @@ export async function orchestrateIntelligence(
       attemptNumber: 2,
       kind: 'retry',
       retryReason: action.retryReason,
+      onAttemptDebug: input.onAttemptDebug,
     });
     attempts.push(second.summary);
     if (second.validation) {
@@ -348,6 +381,7 @@ export async function orchestrateIntelligence(
     attemptNumber: 2,
     kind: 'retry',
     retryReason: 'transport',
+    onAttemptDebug: input.onAttemptDebug,
   });
   attempts.push(second.summary);
   if (second.validation) {

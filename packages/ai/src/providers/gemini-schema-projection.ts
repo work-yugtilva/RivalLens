@@ -109,7 +109,15 @@ export function zodToGeminiCandidateSchema(schema: z.ZodTypeAny): unknown {
   return zodToJsonSchema(schema, { $refStrategy: 'none' });
 }
 
-/** Projects a `zod-to-json-schema` output tree onto Gemini's supported `responseJsonSchema` keyword subset. */
+/**
+ * Projects a `zod-to-json-schema` output tree onto Gemini's supported `responseJsonSchema`
+ * keyword subset.
+ *
+ * Currently unused: Gemini no longer receives a server-enforced schema at all (it kept
+ * rejecting even the fully keyword-legal, deduplicated version this produced -- see
+ * gemini.ts / gemini-format-instruction.ts), so nothing calls this today. Kept, not deleted,
+ * in case server-side structured output for Gemini becomes viable again later.
+ */
 export function projectToGeminiTransportSchema(schema: unknown): unknown {
   return projectNode(schema, '$');
 }

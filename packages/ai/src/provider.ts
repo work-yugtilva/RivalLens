@@ -9,13 +9,24 @@ export type DeepReadonly<T> = T extends (...args: never[]) => unknown
       ? { readonly [Key in keyof T]: DeepReadonly<T[Key]> }
       : T;
 
+export const REASONING_EFFORT_LEVELS = ['low', 'medium', 'high'] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORT_LEVELS)[number];
+
 export type IntelligenceModelParameters = {
   readonly temperature?: number;
   readonly maxOutputTokens?: number;
+  /**
+   * Optional trusted-benchmark reasoning-effort control. Adapters map it to the
+   * provider's native field and reject unsupported levels before any network call.
+   * Omitted => the provider/model default (never silently substituted).
+   */
+  readonly reasoningEffort?: ReasoningEffort;
 };
 
 export const DEFAULT_MAX_OUTPUT_TOKENS = 2048;
-export const MAX_OUTPUT_TOKENS = 2048;
+// Ceiling only. Reasoning-capable models count thinking tokens against this budget,
+// so the per-model `maxOutputTokens` in the benchmark config sets the real spend.
+export const MAX_OUTPUT_TOKENS = 32768;
 export const MIN_TEMPERATURE = 0;
 export const MAX_TEMPERATURE = 1;
 
@@ -66,6 +77,10 @@ export type IntelligenceProviderErrorCode =
 export type IntelligenceProviderErrorMetadata = {
   readonly httpStatus?: number;
   readonly providerRequestId?: string;
+  /** Provider-native error status/code string (e.g. Google's `INVALID_ARGUMENT`). Never the free-text message. */
+  readonly providerErrorCode?: string;
+  /** Dot-path(s) to the offending request/response field, when the provider reports one. Never the violation description. */
+  readonly fieldViolationPaths?: readonly string[];
 };
 
 export class IntelligenceProviderError extends Error {

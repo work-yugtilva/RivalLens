@@ -16,9 +16,13 @@
     "paths": {
       "@/*": ["apps/web/src/*"],
       "@rivallens/ai": ["packages/ai/src/index.ts"],
+      "@rivallens/ai/providers": ["packages/ai/src/providers/index.ts"],
+      "@rivallens/ai/providers/*": ["packages/ai/src/providers/*"],
       "@rivallens/connectors": ["packages/connectors/src/index.ts"],
       "@rivallens/connectors/website": ["packages/connectors/src/website/index.ts"],
       "@rivallens/db": ["packages/db/src/index.ts"],
+      "@rivallens/eval": ["packages/eval/src/index.ts"],
+      "@rivallens/eval/*": ["packages/eval/src/*"],
       "@rivallens/domain": ["packages/domain/src/index.ts"],
       "@rivallens/intelligence": ["packages/intelligence/src/index.ts"],
       "@rivallens/schemas": ["packages/schemas/src/index.ts"]
