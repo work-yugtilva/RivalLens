@@ -1,0 +1,612 @@
+{
+  "type": "object",
+  "properties": {
+    "executiveBriefing": {
+      "type": "object",
+      "properties": {
+        "headline": {
+          "type": "string"
+        },
+        "strategicPostureSummary": {
+          "type": "string"
+        },
+        "keyTakeaway": {
+          "type": "string"
+        },
+        "supportingHypothesisRefs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 5
+        },
+        "claimReferences": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Def_4a625141d1"
+          },
+          "maxItems": 30
+        },
+        "numericClaims": {
+          "$ref": "#/$defs/Def_ca11ae7158"
+        }
+      },
+      "required": [
+        "headline",
+        "strategicPostureSummary",
+        "keyTakeaway",
+        "supportingHypothesisRefs",
+        "claimReferences",
+        "numericClaims"
+      ],
+      "additionalProperties": false
+    },
+    "hypotheses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "competitorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "shipping_friction",
+              "purchase_risk_reduction",
+              "repeat_purchase_mechanics",
+              "promotional_incentives",
+              "pricing_strategy",
+              "bundle_packaging"
+            ]
+          },
+          "statement": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "supportingSignalIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1
+          },
+          "supportingComparisonKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "medium",
+              "low"
+            ]
+          },
+          "uncertainty": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "type": "string",
+                "enum": [
+                  "conversion_effect_not_established",
+                  "retention_effect_not_established",
+                  "promotion_impact_not_established",
+                  "combined_business_impact_not_established"
+                ]
+              },
+              "statement": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "category",
+              "statement"
+            ],
+            "additionalProperties": false
+          },
+          "assumptions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 10
+          },
+          "epistemicClassDependencies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "observed",
+                "derived",
+                "estimated",
+                "reported"
+              ]
+            },
+            "minItems": 1
+          },
+          "claimReferences": {
+            "$ref": "#/$defs/Def_ae92c519c8"
+          },
+          "numericClaims": {
+            "$ref": "#/$defs/Def_ca11ae7158"
+          }
+        },
+        "required": [
+          "ref",
+          "competitorId",
+          "theme",
+          "statement",
+          "rationale",
+          "supportingSignalIds",
+          "supportingComparisonKeys",
+          "confidence",
+          "uncertainty",
+          "assumptions",
+          "epistemicClassDependencies",
+          "claimReferences",
+          "numericClaims"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "maxItems": 5
+    },
+    "experiments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "competitorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hypothesisRef": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "objective": {
+            "type": "string"
+          },
+          "hypothesisUnderTest": {
+            "type": "string"
+          },
+          "variableUnderTest": {
+            "type": "string"
+          },
+          "design": {
+            "type": "object",
+            "properties": {
+              "comparison": {
+                "type": "string",
+                "enum": [
+                  "control_vs_treatment"
+                ]
+              },
+              "variablePolicy": {
+                "type": "string",
+                "enum": [
+                  "single_variable"
+                ]
+              },
+              "controlDescription": {
+                "type": "string"
+              },
+              "treatmentDescription": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "comparison",
+              "variablePolicy",
+              "controlDescription",
+              "treatmentDescription"
+            ],
+            "additionalProperties": false
+          },
+          "primaryMetric": {
+            "$ref": "#/$defs/Def_a586ebc041"
+          },
+          "guardrailMetrics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Def_a586ebc041"
+            },
+            "minItems": 1,
+            "maxItems": 5
+          },
+          "implementationNotes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 2,
+            "maxItems": 8
+          },
+          "caveat": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "type": "string",
+                "enum": [
+                  "shipping_margin_exposure",
+                  "policy_return_refund_exposure",
+                  "subscription_customer_fit_and_cancellation",
+                  "promotion_margin_exposure"
+                ]
+              },
+              "statement": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "category",
+              "statement"
+            ],
+            "additionalProperties": false
+          },
+          "claimReferences": {
+            "$ref": "#/$defs/Def_ae92c519c8"
+          },
+          "numericClaims": {
+            "$ref": "#/$defs/Def_ca11ae7158"
+          }
+        },
+        "required": [
+          "competitorId",
+          "hypothesisRef",
+          "title",
+          "objective",
+          "hypothesisUnderTest",
+          "variableUnderTest",
+          "design",
+          "primaryMetric",
+          "guardrailMetrics",
+          "implementationNotes",
+          "caveat",
+          "claimReferences",
+          "numericClaims"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "maxItems": 5
+    }
+  },
+  "required": [
+    "executiveBriefing",
+    "hypotheses",
+    "experiments"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "Def_48e27b0349": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "comparison"
+          ]
+        },
+        "comparisonKey": {
+          "type": "string"
+        },
+        "competitorId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "subjectId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "assertion": {
+          "type": "string",
+          "enum": [
+            "fact",
+            "absence"
+          ]
+        },
+        "claimedEpistemicClass": {
+          "type": "string",
+          "enum": [
+            "observed",
+            "derived",
+            "estimated",
+            "reported"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "comparisonKey",
+        "competitorId",
+        "subjectId",
+        "assertion",
+        "claimedEpistemicClass"
+      ],
+      "additionalProperties": false
+    },
+    "Def_db5afeae70": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "signal"
+          ]
+        },
+        "signalId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "subjectId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "assertion": {
+          "type": "string",
+          "enum": [
+            "fact",
+            "absence"
+          ]
+        },
+        "claimedEpistemicClass": {
+          "type": "string",
+          "enum": [
+            "observed",
+            "derived",
+            "estimated",
+            "reported"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "signalId",
+        "subjectId",
+        "assertion",
+        "claimedEpistemicClass"
+      ],
+      "additionalProperties": false
+    },
+    "Def_cc2fbe968a": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "observation"
+          ]
+        },
+        "observationId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "subjectId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "assertion": {
+          "type": "string",
+          "enum": [
+            "fact",
+            "absence"
+          ]
+        },
+        "claimedEpistemicClass": {
+          "type": "string",
+          "enum": [
+            "observed",
+            "derived",
+            "estimated",
+            "reported"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "observationId",
+        "subjectId",
+        "assertion",
+        "claimedEpistemicClass"
+      ],
+      "additionalProperties": false
+    },
+    "Def_70e50f858c": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "change"
+          ]
+        },
+        "changeId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "subjectId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "assertion": {
+          "type": "string",
+          "enum": [
+            "fact",
+            "absence"
+          ]
+        },
+        "claimedEpistemicClass": {
+          "type": "string",
+          "enum": [
+            "observed",
+            "derived",
+            "estimated",
+            "reported"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "changeId",
+        "subjectId",
+        "assertion",
+        "claimedEpistemicClass"
+      ],
+      "additionalProperties": false
+    },
+    "Def_d7f0996dbf": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "snippet"
+          ]
+        },
+        "snippetId": {
+          "type": "string"
+        },
+        "subjectId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "assertion": {
+          "type": "string",
+          "enum": [
+            "fact",
+            "absence"
+          ]
+        },
+        "claimedEpistemicClass": {
+          "type": "string",
+          "enum": [
+            "observed",
+            "derived",
+            "estimated",
+            "reported"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "snippetId",
+        "subjectId",
+        "assertion",
+        "claimedEpistemicClass"
+      ],
+      "additionalProperties": false
+    },
+    "Def_4a625141d1": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Def_48e27b0349"
+        },
+        {
+          "$ref": "#/$defs/Def_db5afeae70"
+        },
+        {
+          "$ref": "#/$defs/Def_cc2fbe968a"
+        },
+        {
+          "$ref": "#/$defs/Def_70e50f858c"
+        },
+        {
+          "$ref": "#/$defs/Def_d7f0996dbf"
+        }
+      ]
+    },
+    "Def_0dc83c85fc": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "usd",
+            "days",
+            "percent",
+            "percentage_points"
+          ]
+        },
+        "valueRole": {
+          "type": "string",
+          "enum": [
+            "owned",
+            "competitor",
+            "delta",
+            "previous",
+            "current"
+          ]
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "competitor_lower",
+            "competitor_higher",
+            "increase",
+            "decrease",
+            "equal"
+          ]
+        },
+        "field": {
+          "type": "string"
+        },
+        "reference": {
+          "$ref": "#/$defs/Def_4a625141d1"
+        }
+      },
+      "required": [
+        "value",
+        "unit",
+        "valueRole",
+        "reference"
+      ],
+      "additionalProperties": false
+    },
+    "Def_ca11ae7158": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Def_0dc83c85fc"
+      },
+      "maxItems": 20
+    },
+    "Def_ae92c519c8": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Def_4a625141d1"
+      },
+      "minItems": 1,
+      "maxItems": 30
+    },
+    "Def_a586ebc041": {
+      "type": "string",
+      "enum": [
+        "conversion_rate",
+        "checkout_conversion_rate",
+        "average_order_value",
+        "contribution_margin_per_order",
+        "shipping_cost_per_order",
+        "return_rate",
+        "refund_rate",
+        "subscription_take_rate",
+        "subscription_cancellation_rate"
+      ]
+    }
+  }
+}

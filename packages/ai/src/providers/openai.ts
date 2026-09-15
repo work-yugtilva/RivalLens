@@ -1,11 +1,11 @@
-import OpenAI, { APIConnectionError, APIConnectionTimeoutError, APIError } from 'openai';
+import OpenAI from 'openai';
 import { toStrictJsonSchema } from 'openai/lib/transform';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { z } from 'zod';
 import {
   elapsedMs,
+  mapOpenAiSdkError,
   normalizeParameters,
-  normalizedProviderError,
   parseRawJson,
   serializeRequestContext,
   stripNullObjectProperties,
@@ -79,7 +79,14 @@ export class OpenAiIntelligenceProvider implements IntelligenceModelProvider {
         instructions: request.systemPrompt,
         input: serializeRequestContext(request),
         max_output_tokens: parameters.maxOutputTokens,
-        ...(parameters.temperature === undefined ? {} : { temperature: parameters.temperature }),
+        // GPT-5.x reasoning models reject a non-default temperature unless effort is 'none',
+        // so temperature is dropped whenever a reasoning effort is requested.
+        ...(parameters.temperature === undefined || parameters.reasoningEffort !== undefined
+          ? {}
+          : { temperature: parameters.temperature }),
+        ...(parameters.reasoningEffort === undefined
+          ? {}
+          : { reasoning: { effort: parameters.reasoningEffort } }),
         text: {
           format: {
             type: 'json_schema',
@@ -104,14 +111,8 @@ export class OpenAiIntelligenceProvider implements IntelligenceModelProvider {
         },
       };
     } catch (error) {
-      if (error instanceof APIConnectionTimeoutError) throw normalizedProviderError({ timeout: true });
-      if (error instanceof APIConnectionError) throw normalizedProviderError({ status: 503 });
-      if (error instanceof APIError) {
-        throw normalizedProviderError({
-          status: error.status,
-          ...(error.requestID ? { providerRequestId: error.requestID } : {}),
-        });
-      }
+      const mapped = mapOpenAiSdkError(error);
+      if (mapped) throw mapped;
       throw error;
     }
   }

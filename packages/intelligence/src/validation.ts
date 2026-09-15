@@ -423,6 +423,65 @@ function numericChangeField(
   return typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : undefined;
 }
 
+// `valueRole` (which value a claim asserts) and `direction` (the relation the cited evidence
+// establishes) are orthogonal: a `competitor`- or `owned`-role claim can carry a `direction`
+// just as legitimately as a `delta`-role claim, and it must be checked against the SAME
+// authoritative evidence regardless of which role the current claim happens to assert. This
+// resolves that evidence once per reference; unresolvable/ambiguous evidence fails closed by
+// returning `undefined` rather than silently accepting (or silently guessing at) a direction.
+function resolveDirectionEvidence(
+  resolved: ResolvedReference,
+  field: string | undefined,
+): { readonly directionValue: number; readonly relativeDirection: boolean } | undefined {
+  const { fact, signal, change } = resolved;
+  if (signal) {
+    const supporting = signal.supportingValues;
+    const owned = typeof supporting.owned === 'number' ? supporting.owned : undefined;
+    const competitor =
+      typeof supporting.competitor === 'number' ? supporting.competitor : undefined;
+    const previous = typeof supporting.previous === 'number' ? supporting.previous : undefined;
+    const current = typeof supporting.current === 'number' ? supporting.current : undefined;
+    if (typeof supporting.delta === 'number') {
+      return {
+        directionValue: supporting.delta,
+        relativeDirection: owned !== undefined && competitor !== undefined,
+      };
+    }
+    // Both axes present with no authoritative delta to arbitrate between them: fail closed
+    // rather than silently pick one (a trust-boundary validator prefers a false positive here).
+    if (owned !== undefined && competitor !== undefined && previous !== undefined && current !== undefined) {
+      return undefined;
+    }
+    if (owned !== undefined && competitor !== undefined) {
+      return { directionValue: competitor - owned, relativeDirection: true };
+    }
+    if (previous !== undefined && current !== undefined) {
+      return { directionValue: current - previous, relativeDirection: false };
+    }
+    // e.g. only `owned` is present with no counterpart -- genuinely unverifiable.
+    return undefined;
+  }
+  if (fact) {
+    // A `'comparison'`-kind reference without a `delta` payload has no authoritative pairing
+    // exposed to this validator today -- unverifiable, not "wrong".
+    return fact.delta ? { directionValue: fact.delta.difference, relativeDirection: true } : undefined;
+  }
+  if (change && field) {
+    // Preserve the same unit-recognition gate used for `expectedValue`/`expectedUnit`: never
+    // derive a direction from an arbitrary, untyped before/after field this validator doesn't
+    // recognize as numeric.
+    if (changeFieldUnit(change, field) === undefined) return undefined;
+    const previous = numericChangeField(change.beforeValue, field);
+    const current = numericChangeField(change.afterValue, field);
+    if (previous === undefined || current === undefined) return undefined;
+    return { directionValue: current - previous, relativeDirection: false };
+  }
+  // `'observation'` and `'snippet'` reference kinds resolve to neither fact, signal, nor
+  // change -- no authoritative paired value exists at all, so direction is fundamentally
+  // unverifiable for them.
+  return undefined;
+}
+
 function validateNumericClaim(
   claim: GroundedNumericClaim,
   indexes: ContextIndexes,
@@ -442,8 +501,6 @@ function validateNumericClaim(
   const { fact, signal, change } = referenceResult.resolved;
   let expectedValue: number | undefined;
   let expectedUnit: GroundedNumericClaim['unit'] | undefined;
-  let directionValue: number | undefined;
-  let relativeDirection = false;
 
   if (signal) {
     const supporting = signal.supportingValues;
@@ -455,10 +512,6 @@ function validateNumericClaim(
           ? 'percent'
           : supporting.unit;
     }
-    if (claim.valueRole === 'delta' && typeof value === 'number') {
-      directionValue = value;
-      relativeDirection = supporting.owned !== undefined && supporting.competitor !== undefined;
-    }
   } else if (fact?.delta) {
     if (claim.valueRole === 'owned') expectedValue = fact.delta.ownedValue;
     if (claim.valueRole === 'competitor') expectedValue = fact.delta.competitorValue;
@@ -468,10 +521,6 @@ function validateNumericClaim(
         claim.valueRole === 'delta' && fact.delta.unit === 'percent'
           ? 'percentage_points'
           : fact.delta.unit;
-    }
-    if (claim.valueRole === 'delta') {
-      directionValue = fact.delta.difference;
-      relativeDirection = true;
     }
   } else if (change) {
     const field = claim.field;
@@ -484,11 +533,11 @@ function validateNumericClaim(
         if (claim.valueRole === 'current' && current !== undefined) expectedValue = current;
         if (claim.valueRole === 'delta' && previous !== undefined && current !== undefined) {
           expectedValue = current - previous;
-          directionValue = current - previous;
         }
       }
     }
   }
+  const directionEvidence = resolveDirectionEvidence(referenceResult.resolved, claim.field);
 
   const errors: IntelligenceValidationError[] = [];
   if (claim.valueRole === 'owned' && claim.reference.subjectId !== indexes.context.brand.id) {
@@ -533,18 +582,22 @@ function validateNumericClaim(
       ),
     );
   }
-  if (
-    claim.direction !== undefined &&
-    (directionValue === undefined ||
-      claim.direction !== expectedDirection(directionValue, relativeDirection))
-  ) {
-    errors.push(
-      validationError(
-        'DELTA_DIRECTION_MISMATCH',
-        [...path, 'direction'],
-        'The claimed direction does not match the cited values',
-      ),
-    );
+  if (claim.direction !== undefined) {
+    const directionMismatch =
+      directionEvidence === undefined ||
+      claim.direction !==
+        expectedDirection(directionEvidence.directionValue, directionEvidence.relativeDirection);
+    if (directionMismatch) {
+      errors.push(
+        validationError(
+          'DELTA_DIRECTION_MISMATCH',
+          [...path, 'direction'],
+          directionEvidence === undefined
+            ? 'The cited evidence does not establish a direction'
+            : 'The claimed direction does not match the cited values',
+        ),
+      );
+    }
   }
   return errors;
 }

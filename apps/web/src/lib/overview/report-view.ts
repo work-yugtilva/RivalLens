@@ -1,8 +1,11 @@
 import type {
   CompetitiveIntelligenceReport,
+  CompetitiveReportAny,
   CompetitiveReportExperiment,
   CompetitiveReportFact,
   CompetitiveReportHypothesis,
+  CompetitiveReportLlmExperiment,
+  CompetitiveReportLlmHypothesis,
 } from '@rivallens/schemas';
 import {
   comparisonKeyLabel,
@@ -56,7 +59,7 @@ const INSUFFICIENT_REASONS: Record<CompetitiveReportSectionName, string> = {
 const AWAITING_DETAIL = 'It has not been generated for this report yet.';
 
 export type BuildReportViewInput = {
-  report: CompetitiveIntelligenceReport;
+  report: CompetitiveReportAny;
   /** Latest capture instant across the sources in scope, when known. */
   sourcesCapturedAt?: string | null;
   /** Page types already captured, used only by the insufficient state's note. */
@@ -66,6 +69,9 @@ export type BuildReportViewInput = {
 
 export function buildReportView(input: BuildReportViewInput): ReportView {
   const { report } = input;
+  if (report.reportEngineVersion === 'competitive-report-v2-llm') {
+    return buildLlmReportView(input, report);
+  }
   const { completeness } = report;
   const competitorLabels = report.competitors.map((competitor) => competitor.name);
   const primaryCompetitor = competitorLabels[0] ?? 'the competitor';
@@ -90,6 +96,7 @@ export function buildReportView(input: BuildReportViewInput): ReportView {
       : null;
 
   return {
+    briefing: null,
     status: buildStatus({ report, gapCount, now: input.now }),
     notice: completeness.state === 'partial' ? buildNotice(report) : null,
     generationNotice: buildGenerationNotice(report),
@@ -98,6 +105,64 @@ export function buildReportView(input: BuildReportViewInput): ReportView {
     footerNote: captureRelationSentence(report.generatedAt, input.sourcesCapturedAt ?? null),
     ownedLabel: 'You',
     competitorLabels,
+  };
+}
+
+function buildLlmReportView(
+  input: BuildReportViewInput,
+  report: Extract<CompetitiveReportAny, { reportEngineVersion: 'competitive-report-v2-llm' }>,
+): ReportView {
+  const sectionRows = {
+    yourAdvantages: report.sections.yourAdvantages.map((item, index) =>
+      buildFactRow(item, 'yourAdvantages', index, 'owned'),
+    ),
+    competitorAdvantages: report.sections.competitorAdvantages.map((item, index) =>
+      buildFactRow(item, 'competitorAdvantages', index, 'competitor'),
+    ),
+    appearsToBeWorking: report.sections.appearsToBeWorking.map(buildLlmHypothesisRow),
+    whatToTestNext: report.sections.whatToTestNext.map(buildLlmExperimentRow),
+  };
+  const sections = SECTION_ORDER.map((name) => {
+    const rows = sectionRows[name];
+    const omitted = report.completeness.sections[name].omitted;
+    return {
+      name,
+      title: SECTION_META[name].title,
+      subtitle: SECTION_META[name].subtitle,
+      countLine: buildCountLine({ shown: rows.length, omitted, unresolved: 0, awaiting: 0 }),
+      rows,
+      unresolved: [],
+      awaitingGeneration: [],
+      empty: rows.length === 0 ? buildEmptySection(name, []) : null,
+    };
+  });
+  const count = report.competitors.length;
+  return {
+    briefing: {
+      headline: report.executiveBriefing.headline,
+      summary: report.executiveBriefing.strategicPostureSummary,
+      keyTakeaway: report.executiveBriefing.keyTakeaway,
+    },
+    status: {
+      state: report.completeness.state,
+      label: report.completeness.state === 'partial' ? 'Partial' : 'Complete',
+      competitorCountLabel: `${count} ${plural(count, 'competitor')}`,
+      generatedLabel: `generated ${formatRelative(report.generatedAt, input.now)}`,
+      gapCountLabel: null,
+    },
+    notice:
+      report.completeness.state === 'partial'
+        ? {
+            title: 'This report is partial. What it does show is still verified.',
+            body: 'Only grounded hypotheses, experiments, and briefing content accepted by RivalLens validation are shown.',
+          }
+        : null,
+    generationNotice: null,
+    sections,
+    insufficient: null,
+    footerNote: captureRelationSentence(report.generatedAt, input.sourcesCapturedAt ?? null),
+    ownedLabel: 'You',
+    competitorLabels: report.competitors.map((competitor) => competitor.name),
   };
 }
 
@@ -444,6 +509,45 @@ function buildExperimentRow(item: CompetitiveReportExperiment, index: number): E
     guardrailLabel: `${guardrails} ${plural(guardrails, 'metric')}`,
     readiness: readinessLabel(experiment.primaryMetric.measurementReadiness),
     caveat: experiment.caveat.statement,
+    mobileMetricLine: `${primaryMetric} · ${guardrails} ${plural(guardrails, 'guardrail')}`,
+  };
+}
+
+function buildLlmHypothesisRow(
+  item: CompetitiveReportLlmHypothesis,
+  index: number,
+): HypothesisRowView {
+  const signalCount = item.provenance.signals.length;
+  const classes = item.epistemicClassDependencies.join(', ');
+  return {
+    key: reportItemKey('appearsToBeWorking', index),
+    section: 'appearsToBeWorking',
+    itemType: 'strategic_hypothesis',
+    affordanceLabel: evidenceAffordanceLabel('strategic_hypothesis'),
+    eyebrow: item.title,
+    statement: item.statement,
+    uncertainty: item.uncertainty.statement,
+    supportLine: `Based on ${signalCount} competitive ${plural(signalCount, 'signal')} · ${classes} evidence · ${item.competitorName}`,
+  };
+}
+
+function buildLlmExperimentRow(
+  item: CompetitiveReportLlmExperiment,
+  index: number,
+): ExperimentRowView {
+  const guardrails = item.guardrailMetrics.length;
+  const primaryMetric = metricLabel(item.primaryMetric);
+  return {
+    key: reportItemKey('whatToTestNext', index),
+    section: 'whatToTestNext',
+    itemType: 'recommended_experiment',
+    affordanceLabel: evidenceAffordanceLabel('recommended_experiment'),
+    title: item.title,
+    objective: item.statement,
+    primaryMetric,
+    guardrailLabel: `${guardrails} ${plural(guardrails, 'metric')}`,
+    readiness: 'Requires first-party data',
+    caveat: item.caveat.statement,
     mobileMetricLine: `${primaryMetric} · ${guardrails} ${plural(guardrails, 'guardrail')}`,
   };
 }

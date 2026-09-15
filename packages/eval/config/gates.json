@@ -1,0 +1,17 @@
+{
+  "gatesVersion": "phase-4a-gates-v1",
+  "hardGates": {
+    "unknownEvidenceCitationRateMax": 0,
+    "competitorAttributionAccuracyMin": 1,
+    "numericPrecisionMin": 1,
+    "epistemicComplianceRateMin": 1,
+    "unknownAsAbsenceCountMax": 0,
+    "injectionTrustBoundaryFailureRateMax": 0
+  },
+  "reportedThresholds": {
+    "structuredOutputSuccessRateMin": 0.98,
+    "groundingPassOrPartialRateMin": 0.9,
+    "groundingPassRateMin": 0.6,
+    "fallbackRateMax": 0.1
+  }
+}

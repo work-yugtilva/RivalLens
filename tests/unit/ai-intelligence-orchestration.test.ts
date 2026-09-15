@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as ai from '../../packages/ai/src';
+import { orchestrateIntelligenceTrusted } from '../../packages/ai/src/orchestration';
 import {
   buildIntelligenceContext,
   generateStrategicHypotheses,
@@ -90,6 +91,9 @@ describe('orchestrateIntelligence', () => {
 
     expect(api.isProviderFailureRetryable).toBeTypeOf('function');
     expect(api.isProviderFailureRetryable?.('timeout')).toBe(true);
+    expect(api.isProviderFailureRetryable?.('provider_unavailable')).toBe(true);
+    expect(api.isProviderFailureRetryable?.('rate_limit')).toBe(false);
+    expect(api.isProviderFailureRetryable?.('authentication_configuration')).toBe(false);
     expect(api.isProviderFailureRetryable?.('provider_exception')).toBe(false);
   });
 
@@ -293,5 +297,175 @@ describe('orchestrateIntelligence', () => {
     expect(first.provider.calls).toBeLessThanOrEqual(2);
     expect(second.provider.calls).toBeLessThanOrEqual(2);
     expect(first.result).toEqual(second.result);
+  });
+});
+
+describe('orchestrateIntelligence onAttemptDebug (eval/debug-only hook)', () => {
+  type DebugAttempt = {
+    attemptNumber: 1 | 2;
+    kind: 'initial' | 'retry';
+    retryReason?: string;
+    contextHash: string;
+    promptVersion: string;
+    rawOutput: unknown;
+    validation: { status: string; errors: unknown[] };
+  };
+
+  async function orchestrateWithDebug(
+    scenarios: string | readonly string[],
+    onAttemptDebug: (attempt: DebugAttempt) => void,
+  ) {
+    const api = ai as unknown as OrchestrationApi;
+    const { context, currentSignals } = fixture();
+    expect(api.orchestrateIntelligence).toBeTypeOf('function');
+    expect(api.DeterministicMockIntelligenceProvider).toBeTypeOf('function');
+    if (!api.orchestrateIntelligence || !api.DeterministicMockIntelligenceProvider) {
+      throw new Error('Phase 3C orchestration API is unavailable');
+    }
+    const provider = new api.DeterministicMockIntelligenceProvider(scenarios);
+    const result = record(
+      await api.orchestrateIntelligence({
+        context,
+        contextHash: intelligenceContextHash(context),
+        provider,
+        promptVersion: 'phase-3c-test',
+        systemPrompt: 'Return the requested structured intelligence synthesis.',
+        deterministicFallback: deterministicFallback(currentSignals),
+        onAttemptDebug,
+      } as unknown as Parameters<NonNullable<typeof api.orchestrateIntelligence>>[0]),
+    );
+    return result;
+  }
+
+  it('fires once per successful attempt with full validation detail (path + message)', async () => {
+    const seen: DebugAttempt[] = [];
+    const result = await orchestrateWithDebug(['unknown_evidence_id', 'valid'], (attempt) =>
+      seen.push(attempt),
+    );
+
+    expect(result.status).toBe('llm_success');
+    expect(seen).toHaveLength(2);
+    expect(seen[0]!.attemptNumber).toBe(1);
+    expect(seen[0]!.kind).toBe('initial');
+    expect(seen[0]!.validation.status).not.toBe('passed');
+    expect(seen[0]!.validation.errors.length).toBeGreaterThan(0);
+    for (const error of seen[0]!.validation.errors) {
+      const typed = error as { code: string; path: unknown[]; message: string };
+      expect(typeof typed.code).toBe('string');
+      expect(Array.isArray(typed.path)).toBe(true);
+      expect(typeof typed.message).toBe('string');
+    }
+    expect(seen[1]!.attemptNumber).toBe(2);
+    expect(seen[1]!.retryReason).toBe('validation_repair');
+    expect(seen[1]!.validation.status).toBe('passed');
+    expect(seen[0]!.rawOutput).not.toEqual(seen[1]!.rawOutput);
+  });
+
+  it('does not fire for a transport failure that produced no model output', async () => {
+    const seen: DebugAttempt[] = [];
+    const result = await orchestrateWithDebug(['timeout', 'valid'], (attempt) => seen.push(attempt));
+
+    expect(result.status).toBe('llm_success');
+    // Only the successful transport-retry attempt fires; the timed-out first attempt never does.
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.attemptNumber).toBe(2);
+    expect(seen[0]!.retryReason).toBe('transport');
+  });
+
+  it('never fires when omitted, and a throwing hook cannot alter the orchestration result', async () => {
+    const api = ai as unknown as OrchestrationApi;
+    const { context, currentSignals } = fixture();
+    if (!api.orchestrateIntelligence || !api.DeterministicMockIntelligenceProvider) {
+      throw new Error('Phase 3C orchestration API is unavailable');
+    }
+
+    const baseline = record(
+      await api.orchestrateIntelligence({
+        context,
+        contextHash: intelligenceContextHash(context),
+        provider: new api.DeterministicMockIntelligenceProvider(['unknown_evidence_id', 'valid']),
+        promptVersion: 'phase-3c-test',
+        systemPrompt: 'Return the requested structured intelligence synthesis.',
+        deterministicFallback: deterministicFallback(currentSignals),
+      }),
+    );
+
+    const withThrowingHook = record(
+      await api.orchestrateIntelligence({
+        context,
+        contextHash: intelligenceContextHash(context),
+        provider: new api.DeterministicMockIntelligenceProvider(['unknown_evidence_id', 'valid']),
+        promptVersion: 'phase-3c-test',
+        systemPrompt: 'Return the requested structured intelligence synthesis.',
+        deterministicFallback: deterministicFallback(currentSignals),
+        onAttemptDebug: () => {
+          throw new Error('debug hook must never affect orchestration');
+        },
+      } as unknown as Parameters<NonNullable<typeof api.orchestrateIntelligence>>[0]),
+    );
+
+    expect(withThrowingHook).toEqual(baseline);
+    expect(withThrowingHook).not.toHaveProperty('rawOutput');
+  });
+});
+
+describe('production persistence attempt capture', () => {
+  it('keeps the trusted capture runner out of the ordinary package surface', () => {
+    expect(ai).not.toHaveProperty('orchestrateIntelligenceTrusted');
+    expect(ai).not.toHaveProperty('orchestrateIntelligenceForPersistence');
+  });
+
+  it.each([
+    {
+      scenarios: ['unknown_evidence_id', 'valid'] as const,
+      retryReason: 'validation_repair',
+      firstHasRawOutput: true,
+    },
+    {
+      scenarios: ['timeout', 'valid'] as const,
+      retryReason: 'transport',
+      firstHasRawOutput: false,
+    },
+  ])('captures $retryReason attempts without changing the safe result', async (testCase) => {
+    const { context, currentSignals } = fixture();
+    const Provider = ai.DeterministicMockIntelligenceProvider;
+    const trusted = await orchestrateIntelligenceTrusted({
+      context,
+      contextHash: intelligenceContextHash(context),
+      provider: new Provider(testCase.scenarios),
+      promptVersion: 'production-capture-test',
+      systemPrompt: 'Return the requested structured intelligence synthesis.',
+      deterministicFallback: deterministicFallback(currentSignals),
+    });
+
+    expect(trusted.result.status).toBe('llm_success');
+    expect(trusted.persistenceAttempts).toHaveLength(2);
+    if (testCase.firstHasRawOutput) {
+      expect(trusted.persistenceAttempts[0]).toHaveProperty('rawOutput', expect.any(Object));
+    }
+    if (!testCase.firstHasRawOutput) {
+      expect(trusted.persistenceAttempts[0]).not.toHaveProperty('rawOutput');
+      expect(trusted.persistenceAttempts[0]).not.toHaveProperty('telemetry');
+      expect(trusted.persistenceAttempts[0]).toMatchObject({ providerFailure: 'timeout' });
+    }
+    expect(trusted.persistenceAttempts[1]).toMatchObject({
+      attemptNumber: 2,
+      kind: 'retry',
+      retryReason: testCase.retryReason,
+      rawOutput: { value: expect.any(Object) },
+    });
+    expect(trusted.persistenceAttempts[1]!.promptVersion).toBe(
+      testCase.retryReason === 'validation_repair'
+        ? 'production-capture-test:repair-v1'
+        : 'production-capture-test',
+    );
+    expect(trusted.frozenContext).toBeDefined();
+    expect(Object.isFrozen(trusted.frozenContext)).toBe(true);
+    const publicResult = JSON.stringify(trusted.result);
+    expect(publicResult).not.toContain('rawOutput');
+    expect(publicResult).not.toContain('rawResponseId');
+    expect(publicResult).not.toContain('providerRequestId');
+    expect(publicResult).not.toContain('telemetry');
+    expect(publicResult).not.toContain('errorCodes');
   });
 });

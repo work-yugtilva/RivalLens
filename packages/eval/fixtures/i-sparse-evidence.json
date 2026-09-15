@@ -1,0 +1,184 @@
+{
+  "adversarial": false,
+  "context": {
+    "analysisObjective": "general_overview",
+    "brand": {
+      "domain": "owned.test",
+      "id": "11111111-1111-4111-8111-111111111111"
+    },
+    "competitors": [
+      {
+        "domain": "rival.test",
+        "id": "22222222-2222-4222-8222-222222222222"
+      }
+    ],
+    "contextVersion": "intelligence-context-v1",
+    "facts": [
+      {
+        "competitor": {
+          "domain": "rival.test",
+          "provenance": {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001001",
+            "observedAt": "2026-09-04T12:00:00.000Z",
+            "snapshotId": "00000000-0000-4000-8000-000000000911",
+            "sourceId": "00000000-0000-4000-8000-000000000901",
+            "sourceUrl": "https://synthetic-1.test/"
+          },
+          "state": "present",
+          "subjectId": "22222222-2222-4222-8222-222222222222",
+          "subjectRole": "competitor",
+          "value": {}
+        },
+        "epistemicClass": "observed",
+        "key": "offer.buy_x_get_y",
+        "owned": {
+          "domain": "owned.test",
+          "provenance": {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001000",
+            "observedAt": "2026-09-04T12:00:00.000Z",
+            "snapshotId": "00000000-0000-4000-8000-000000000910",
+            "sourceId": "00000000-0000-4000-8000-000000000900",
+            "sourceUrl": "https://synthetic-0.test/"
+          },
+          "state": "explicitly_absent",
+          "subjectId": "11111111-1111-4111-8111-111111111111",
+          "subjectRole": "owned",
+          "value": null
+        }
+      }
+    ],
+    "generatedAt": "2026-09-04T12:00:00.000Z",
+    "limits": {
+      "maxCompetitors": 5,
+      "maxFacts": 30,
+      "maxRecentChanges": 10,
+      "maxSerializedBytes": 65536,
+      "maxSignals": 30,
+      "maxUntrustedSnippets": 5
+    },
+    "recentChanges": [],
+    "signals": [
+      {
+        "comparisonKey": "offer.buy_x_get_y",
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "confidence": "high",
+        "direction": "different",
+        "epistemicClass": "derived",
+        "evidence": [
+          {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001000",
+            "role": "owned",
+            "snapshotId": "00000000-0000-4000-8000-000000000910",
+            "sourceId": "00000000-0000-4000-8000-000000000900",
+            "sourceUrl": "https://synthetic-0.test/"
+          },
+          {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001001",
+            "role": "competitor",
+            "snapshotId": "00000000-0000-4000-8000-000000000911",
+            "sourceId": "00000000-0000-4000-8000-000000000901",
+            "sourceUrl": "https://synthetic-1.test/"
+          }
+        ],
+        "id": "00000000-0000-4000-8000-000000000001",
+        "signalType": "competitor_offers_bogo_owned_does_not",
+        "statement": "rival.test offers a buy-one-get-one offer while the owned brand does not.",
+        "supportingValues": {
+          "competitor": true,
+          "owned": false
+        }
+      }
+    ],
+    "untrustedSnippets": []
+  },
+  "contextHash": "sha256:a34dcf4bc13c4cd88353245e18c660627f07a6995d2be163212e3df027c3c482",
+  "description": "Synthetic: a single weak presence difference and nothing else.",
+  "expectedDeterministic": {
+    "fallbackAllowed": true,
+    "maxAcceptedHypotheses": 1,
+    "schemaValidatable": true,
+    "validatorStatusIn": [
+      "passed",
+      "partial"
+    ]
+  },
+  "fallbackSeed": {
+    "generatedAt": "2026-09-04T12:00:00.000Z",
+    "hypotheses": [
+      {
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "confidence": "medium",
+        "generatedAt": "2026-09-04T12:00:00.000Z",
+        "generationProvenance": {
+          "method": "deterministic_template",
+          "sourceSignalRuleVersion": "competitive-signals-v1",
+          "templateId": "competitor_may_emphasize_promotional_incentives"
+        },
+        "hypothesisEngineVersion": "strategic-hypotheses-v1",
+        "hypothesisHash": "sha256:a7dc98e0b9e9f952a6a3a9622613e6b3de52d34b84fc6fbdd20eaa79eefaa147",
+        "hypothesisType": "competitor_may_emphasize_promotional_incentives",
+        "id": "00000000-0000-4000-8000-000000000700",
+        "ownedBrandId": "11111111-1111-4111-8111-111111111111",
+        "rationale": "Current competitive signals show explicit promotional mechanics that the owned brand lacks or a larger explicit percentage discount.",
+        "statement": "The competitor may be leaning more heavily on promotional incentives.",
+        "supportingSignalIds": [
+          "00000000-0000-4000-8000-000000000001"
+        ],
+        "uncertainty": {
+          "category": "promotion_impact_not_established",
+          "statement": "This indicates a promotional difference, not its business impact."
+        }
+      }
+    ],
+    "signals": [
+      {
+        "comparisonKey": "offer.buy_x_get_y",
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "confidence": "high",
+        "direction": "different",
+        "evidence": [
+          {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001000",
+            "role": "owned",
+            "snapshotId": "00000000-0000-4000-8000-000000000910",
+            "sourceId": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001001",
+            "role": "competitor",
+            "snapshotId": "00000000-0000-4000-8000-000000000911",
+            "sourceId": "00000000-0000-4000-8000-000000000901"
+          }
+        ],
+        "generatedAt": "2026-09-04T12:00:00.000Z",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "ownedBrandId": "11111111-1111-4111-8111-111111111111",
+        "ruleVersion": "competitive-signals-v1",
+        "signalHash": "sha256:441e0d3d2dab19551bb514c8199a03bc47ee7f74d1c8118401c93c64bb2454d7",
+        "signalType": "competitor_offers_bogo_owned_does_not",
+        "statement": "rival.test offers a buy-one-get-one offer while the owned brand does not.",
+        "supportingValues": {
+          "competitor": true,
+          "owned": false
+        }
+      }
+    ]
+  },
+  "fixtureId": "i-sparse-evidence",
+  "fixtureVersion": "1",
+  "humanReviewNotes": "Thin evidence. A good model produces at most one conservative hypothesis, or defers.",
+  "mockScenario": "valid",
+  "scenarioLetter": "I",
+  "scenarioTags": [
+    "sparse",
+    "low-evidence"
+  ],
+  "suiteVersion": "phase-4a-v1",
+  "synthetic": true
+}

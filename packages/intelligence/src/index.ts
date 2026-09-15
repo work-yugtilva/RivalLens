@@ -40,11 +40,32 @@ export {
 } from './reports';
 
 export {
+  COMPETITIVE_REPORT_LLM_ENGINE_VERSION,
+  composeLlmCompetitiveIntelligenceReport,
+  type ComposeLlmCompetitiveReportInput,
+  type PersistedLlmReportBriefing,
+  type PersistedLlmReportExperiment,
+  type PersistedLlmReportHypothesis,
+} from './llm-reports';
+
+export {
   buildIntelligenceContext,
   canonicalContext,
   intelligenceContextHash,
   type BuildIntelligenceContextInput,
 } from './context';
+
+export {
+  INTELLIGENCE_SYNTHESIS_PROMPT_VERSION,
+  INTELLIGENCE_SYNTHESIS_SYSTEM_PROMPT,
+} from './synthesis-prompt';
+
+export {
+  INTELLIGENCE_VALIDATOR_CONTRACT_VERSION,
+  prepareIntelligenceGenerationPersistence,
+  type IntelligencePersistenceRejectionCode,
+  type PrepareIntelligenceGenerationPersistenceResult,
+} from './persistence';
 
 export {
   validateIntelligenceSynthesis,

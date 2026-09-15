@@ -1,0 +1,315 @@
+{
+  "adversarial": false,
+  "context": {
+    "analysisObjective": "general_overview",
+    "brand": {
+      "domain": "owned.test",
+      "id": "11111111-1111-4111-8111-111111111111"
+    },
+    "competitors": [
+      {
+        "domain": "rival.test",
+        "id": "22222222-2222-4222-8222-222222222222"
+      }
+    ],
+    "contextVersion": "intelligence-context-v1",
+    "facts": [
+      {
+        "competitor": {
+          "domain": "rival.test",
+          "provenance": {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001004",
+            "observedAt": "2026-09-04T12:00:00.000Z",
+            "snapshotId": "00000000-0000-4000-8000-000000000911",
+            "sourceId": "00000000-0000-4000-8000-000000000901",
+            "sourceUrl": "https://synthetic-1.test/"
+          },
+          "state": "present",
+          "subjectId": "22222222-2222-4222-8222-222222222222",
+          "subjectRole": "competitor",
+          "value": {
+            "durationDays": 730
+          }
+        },
+        "delta": {
+          "competitorSubjectId": "22222222-2222-4222-8222-222222222222",
+          "competitorValue": 730,
+          "difference": 365,
+          "ownedValue": 365,
+          "unit": "days"
+        },
+        "epistemicClass": "observed",
+        "key": "policy.guarantee_duration",
+        "owned": {
+          "domain": "owned.test",
+          "provenance": {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001003",
+            "observedAt": "2026-09-04T12:00:00.000Z",
+            "snapshotId": "00000000-0000-4000-8000-000000000910",
+            "sourceId": "00000000-0000-4000-8000-000000000900",
+            "sourceUrl": "https://synthetic-0.test/"
+          },
+          "state": "present",
+          "subjectId": "11111111-1111-4111-8111-111111111111",
+          "subjectRole": "owned",
+          "value": {
+            "durationDays": 365
+          }
+        }
+      },
+      {
+        "competitor": {
+          "domain": "rival.test",
+          "provenance": {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001001",
+            "observedAt": "2026-09-04T12:00:00.000Z",
+            "snapshotId": "00000000-0000-4000-8000-000000000911",
+            "sourceId": "00000000-0000-4000-8000-000000000901",
+            "sourceUrl": "https://synthetic-1.test/"
+          },
+          "state": "present",
+          "subjectId": "22222222-2222-4222-8222-222222222222",
+          "subjectRole": "competitor",
+          "value": {
+            "durationDays": 60
+          }
+        },
+        "delta": {
+          "competitorSubjectId": "22222222-2222-4222-8222-222222222222",
+          "competitorValue": 60,
+          "difference": 30,
+          "ownedValue": 30,
+          "unit": "days"
+        },
+        "epistemicClass": "observed",
+        "key": "policy.return_window",
+        "owned": {
+          "domain": "owned.test",
+          "provenance": {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001000",
+            "observedAt": "2026-09-04T12:00:00.000Z",
+            "snapshotId": "00000000-0000-4000-8000-000000000910",
+            "sourceId": "00000000-0000-4000-8000-000000000900",
+            "sourceUrl": "https://synthetic-0.test/"
+          },
+          "state": "present",
+          "subjectId": "11111111-1111-4111-8111-111111111111",
+          "subjectRole": "owned",
+          "value": {
+            "durationDays": 30
+          }
+        }
+      }
+    ],
+    "generatedAt": "2026-09-04T12:00:00.000Z",
+    "limits": {
+      "maxCompetitors": 5,
+      "maxFacts": 30,
+      "maxRecentChanges": 10,
+      "maxSerializedBytes": 65536,
+      "maxSignals": 30,
+      "maxUntrustedSnippets": 5
+    },
+    "recentChanges": [],
+    "signals": [
+      {
+        "comparisonKey": "policy.guarantee_duration",
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "confidence": "high",
+        "direction": "competitor_higher",
+        "epistemicClass": "derived",
+        "evidence": [
+          {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001003",
+            "role": "owned",
+            "snapshotId": "00000000-0000-4000-8000-000000000910",
+            "sourceId": "00000000-0000-4000-8000-000000000900",
+            "sourceUrl": "https://synthetic-0.test/"
+          },
+          {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001004",
+            "role": "competitor",
+            "snapshotId": "00000000-0000-4000-8000-000000000911",
+            "sourceId": "00000000-0000-4000-8000-000000000901",
+            "sourceUrl": "https://synthetic-1.test/"
+          }
+        ],
+        "id": "00000000-0000-4000-8000-000000000001",
+        "signalType": "competitor_longer_guarantee_duration",
+        "statement": "rival.test's guarantee duration is 365 days longer than the owned brand's.",
+        "supportingValues": {
+          "competitor": 730,
+          "delta": 365,
+          "owned": 365,
+          "unit": "days"
+        }
+      },
+      {
+        "comparisonKey": "policy.return_window",
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "confidence": "high",
+        "direction": "competitor_higher",
+        "epistemicClass": "derived",
+        "evidence": [
+          {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001000",
+            "role": "owned",
+            "snapshotId": "00000000-0000-4000-8000-000000000910",
+            "sourceId": "00000000-0000-4000-8000-000000000900",
+            "sourceUrl": "https://synthetic-0.test/"
+          },
+          {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001001",
+            "role": "competitor",
+            "snapshotId": "00000000-0000-4000-8000-000000000911",
+            "sourceId": "00000000-0000-4000-8000-000000000901",
+            "sourceUrl": "https://synthetic-1.test/"
+          }
+        ],
+        "id": "00000000-0000-4000-8000-000000000002",
+        "signalType": "competitor_longer_return_window",
+        "statement": "rival.test's return window is 30 days longer than the owned brand's.",
+        "supportingValues": {
+          "competitor": 60,
+          "delta": 30,
+          "owned": 30,
+          "unit": "days"
+        }
+      }
+    ],
+    "untrustedSnippets": []
+  },
+  "contextHash": "sha256:8e602bbbd3355b40df50202b21fc4b0ad53b7d93f105dfadc1dd248d7bf634b9",
+  "description": "Synthetic: competitor offers a longer return window and a longer guarantee than the owned brand.",
+  "expectedDeterministic": {
+    "fallbackAllowed": false,
+    "schemaValidatable": true,
+    "validatorStatusIn": [
+      "passed",
+      "partial"
+    ]
+  },
+  "fallbackSeed": {
+    "generatedAt": "2026-09-04T12:00:00.000Z",
+    "hypotheses": [
+      {
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "confidence": "medium",
+        "generatedAt": "2026-09-04T12:00:00.000Z",
+        "generationProvenance": {
+          "method": "deterministic_template",
+          "sourceSignalRuleVersion": "competitive-signals-v1",
+          "templateId": "competitor_may_reduce_perceived_purchase_risk"
+        },
+        "hypothesisEngineVersion": "strategic-hypotheses-v1",
+        "hypothesisHash": "sha256:ccaf5d0d5badc37a62beb6a30f581675f1131767b7295952c7fd91a64d82823d",
+        "hypothesisType": "competitor_may_reduce_perceived_purchase_risk",
+        "id": "00000000-0000-4000-8000-000000000700",
+        "ownedBrandId": "11111111-1111-4111-8111-111111111111",
+        "rationale": "Current competitive signals show a longer return window or guarantee than the owned brand offers.",
+        "statement": "The competitor may be using a more permissive post-purchase policy to reduce perceived purchase risk.",
+        "supportingSignalIds": [
+          "00000000-0000-4000-8000-000000000001",
+          "00000000-0000-4000-8000-000000000002"
+        ],
+        "uncertainty": {
+          "category": "conversion_effect_not_established",
+          "statement": "Public evidence does not establish whether this improves conversion."
+        }
+      }
+    ],
+    "signals": [
+      {
+        "comparisonKey": "policy.guarantee_duration",
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "confidence": "high",
+        "direction": "competitor_higher",
+        "evidence": [
+          {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001003",
+            "role": "owned",
+            "snapshotId": "00000000-0000-4000-8000-000000000910",
+            "sourceId": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001004",
+            "role": "competitor",
+            "snapshotId": "00000000-0000-4000-8000-000000000911",
+            "sourceId": "00000000-0000-4000-8000-000000000901"
+          }
+        ],
+        "generatedAt": "2026-09-04T12:00:00.000Z",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "ownedBrandId": "11111111-1111-4111-8111-111111111111",
+        "ruleVersion": "competitive-signals-v1",
+        "signalHash": "sha256:5e9d78ab1c42591e838a1cc826d068c39edd49c9f69fb94c5bb51f5fe6cf11fe",
+        "signalType": "competitor_longer_guarantee_duration",
+        "statement": "rival.test's guarantee duration is 365 days longer than the owned brand's.",
+        "supportingValues": {
+          "competitor": 730,
+          "delta": 365,
+          "owned": 365,
+          "unit": "days"
+        }
+      },
+      {
+        "comparisonKey": "policy.return_window",
+        "competitorId": "22222222-2222-4222-8222-222222222222",
+        "confidence": "high",
+        "direction": "competitor_higher",
+        "evidence": [
+          {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001000",
+            "role": "owned",
+            "snapshotId": "00000000-0000-4000-8000-000000000910",
+            "sourceId": "00000000-0000-4000-8000-000000000900"
+          },
+          {
+            "confidence": 0.95,
+            "observationId": "00000000-0000-4000-8000-000000001001",
+            "role": "competitor",
+            "snapshotId": "00000000-0000-4000-8000-000000000911",
+            "sourceId": "00000000-0000-4000-8000-000000000901"
+          }
+        ],
+        "generatedAt": "2026-09-04T12:00:00.000Z",
+        "id": "00000000-0000-4000-8000-000000000002",
+        "ownedBrandId": "11111111-1111-4111-8111-111111111111",
+        "ruleVersion": "competitive-signals-v1",
+        "signalHash": "sha256:7b307774f73a8b09ba30af823b35cbba933239fa7b9137abcc09e8a3cbf4e514",
+        "signalType": "competitor_longer_return_window",
+        "statement": "rival.test's return window is 30 days longer than the owned brand's.",
+        "supportingValues": {
+          "competitor": 60,
+          "delta": 30,
+          "owned": 30,
+          "unit": "days"
+        }
+      }
+    ]
+  },
+  "fixtureId": "c-return-window-guarantee-diff",
+  "fixtureVersion": "1",
+  "humanReviewNotes": "Two purchase-risk signals that should combine into one coherent read.",
+  "mockScenario": "valid",
+  "scenarioLetter": "C",
+  "scenarioTags": [
+    "returns",
+    "guarantee",
+    "numeric-difference",
+    "purchase-risk"
+  ],
+  "suiteVersion": "phase-4a-v1",
+  "synthetic": true
+}

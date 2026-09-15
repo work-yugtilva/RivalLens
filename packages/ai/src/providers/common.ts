@@ -1,3 +1,4 @@
+import { APIConnectionError, APIConnectionTimeoutError, APIError } from 'openai';
 import type { z } from 'zod';
 import {
   DEFAULT_MAX_OUTPUT_TOKENS,
@@ -5,14 +6,16 @@ import {
   MAX_OUTPUT_TOKENS,
   MAX_TEMPERATURE,
   MIN_TEMPERATURE,
+  REASONING_EFFORT_LEVELS,
   type IntelligenceModelParameters,
   type IntelligenceProviderErrorCode,
   type IntelligenceProviderErrorMetadata,
   type IntelligenceRequest,
+  type ReasoningEffort,
 } from '../provider';
 
 export const DEFAULT_PROVIDER_TIMEOUT_MS = 30_000;
-const MAX_PROVIDER_TIMEOUT_MS = 120_000;
+export const MAX_PROVIDER_TIMEOUT_MS = 120_000;
 
 export type ProviderAdapterOptions = {
   readonly apiKey: string;
@@ -23,6 +26,7 @@ export type ProviderAdapterOptions = {
 export type NormalizedModelParameters = {
   readonly maxOutputTokens: number;
   readonly temperature?: number;
+  readonly reasoningEffort?: ReasoningEffort;
 };
 
 export function validateProviderOptions(options: ProviderAdapterOptions): Required<ProviderAdapterOptions> {
@@ -66,7 +70,35 @@ export function normalizeParameters(
       'The requested temperature is invalid',
     );
   }
-  return { maxOutputTokens, ...(temperature === undefined ? {} : { temperature }) };
+  const reasoningEffort = parameters?.reasoningEffort;
+  if (reasoningEffort !== undefined && !REASONING_EFFORT_LEVELS.includes(reasoningEffort)) {
+    throw new IntelligenceProviderError(
+      'invalid_request',
+      'The requested reasoning effort is invalid',
+    );
+  }
+  return {
+    maxOutputTokens,
+    ...(temperature === undefined ? {} : { temperature }),
+    ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
+  };
+}
+
+/**
+ * Normalizes an `openai`-SDK error (used by both the first-party OpenAI adapter and the
+ * shared OpenAI-compatible adapter) into the provider-neutral failure taxonomy.
+ * Returns `null` for anything that is not a recognized SDK error so the caller can rethrow.
+ */
+export function mapOpenAiSdkError(error: unknown): IntelligenceProviderError | null {
+  if (error instanceof APIConnectionTimeoutError) return normalizedProviderError({ timeout: true });
+  if (error instanceof APIConnectionError) return normalizedProviderError({ status: 503 });
+  if (error instanceof APIError) {
+    return normalizedProviderError({
+      status: error.status,
+      ...(error.requestID ? { providerRequestId: error.requestID } : {}),
+    });
+  }
+  return null;
 }
 
 export function serializeRequestContext<TSchema extends z.ZodTypeAny>(
@@ -115,6 +147,8 @@ export function normalizedProviderError(input: {
   readonly status?: number;
   readonly providerRequestId?: string;
   readonly timeout?: boolean;
+  readonly providerErrorCode?: string;
+  readonly fieldViolationPaths?: readonly string[];
 }): IntelligenceProviderError {
   const code: IntelligenceProviderErrorCode = input.timeout
     ? 'timeout'
@@ -132,6 +166,10 @@ export function normalizedProviderError(input: {
   const metadata: IntelligenceProviderErrorMetadata = {
     ...(input.status === undefined ? {} : { httpStatus: input.status }),
     ...(input.providerRequestId ? { providerRequestId: input.providerRequestId } : {}),
+    ...(input.providerErrorCode ? { providerErrorCode: input.providerErrorCode } : {}),
+    ...(input.fieldViolationPaths && input.fieldViolationPaths.length > 0
+      ? { fieldViolationPaths: input.fieldViolationPaths }
+      : {}),
   };
   return new IntelligenceProviderError(
     code,

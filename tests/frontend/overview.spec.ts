@@ -9,10 +9,31 @@ const states = [
   'generation-required',
   'unresolved',
   'empty-section',
+  'llm-complete',
+  'llm-partial',
   'no-report',
   'loading',
   'error',
 ];
+
+test('LLM reports show safe briefing and partial state without audit identifiers', async ({ page }) => {
+  for (const state of ['llm-complete', 'llm-partial']) {
+    await page.goto(`/overview/preview/${state}`);
+    await expect(page.getByRole('region', { name: 'Executive briefing' })).toBeVisible();
+    await expect(page.getByText('Treat the pattern as a testable signal, not a proven outcome.')).toBeVisible();
+    const text = await page.getByRole('main').innerText();
+    expect(text).not.toMatch(/generationRunId|providerId|modelId|sha256:|rawOutput/);
+  }
+
+  await page.goto('/overview/preview/llm-complete');
+  await page.getByRole('button', { name: /Possible shipping-friction strategy/ }).click();
+  const drawer = page.getByRole('dialog');
+  await expect(drawer).toContainText('Why RivalLens is telling you this');
+  expect(await drawer.innerText()).not.toMatch(/sha256:|00000000-|generationRunId|providerId/);
+
+  await page.goto('/overview/preview/llm-partial');
+  await expect(page.getByText('This report is partial. What it does show is still verified.')).toBeVisible();
+});
 
 for (const width of widths) {
   test(`states, accessibility and reflow at ${width}px`, async ({ page }, testInfo) => {

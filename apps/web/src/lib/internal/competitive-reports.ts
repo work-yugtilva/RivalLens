@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { isDeepStrictEqual } from 'node:util';
+import type { SubjectSourceEvidence } from '@rivallens/domain';
 import {
   composeCompetitiveIntelligenceReport,
   resolveCurrentCompetitiveSignals,
@@ -10,11 +11,21 @@ import {
 import {
   competitiveIntelligenceReportCandidateSchema,
   competitiveIntelligenceReportSchema,
+  competitiveReportAnySchema,
+  competitiveReportV2LlmCandidateSchema,
+  competitiveReportV2LlmSchema,
   currentCompetitiveSignalsProjectionSchema,
   currentRecommendedExperimentsProjectionSchema,
   currentStrategicHypothesesProjectionSchema,
   type CompetitiveIntelligenceReport,
   type CompetitiveIntelligenceReportCandidate,
+  type CompetitiveReportAny,
+  type CompetitiveReportV2LlmCandidate,
+  type BrandComparisonResult,
+  type CompetitiveSignal,
+  type CurrentCompetitiveSignalsProjection,
+  type CurrentRecommendedExperimentsProjection,
+  type CurrentStrategicHypothesesProjection,
 } from '@rivallens/schemas';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
@@ -35,13 +46,25 @@ const persistedReportRpcRowSchema = z
   .strict();
 const persistedReportRpcRowsSchema = z.array(persistedReportRpcRowSchema).length(1);
 
-const persistedReportRowSchema = persistedReportRpcRowSchema
-  .extend({
+const persistedLlmReportRpcRowSchema = z
+  .object({
+    id: uuidSchema,
+    generation_run_id: uuidSchema,
+    payload: competitiveReportV2LlmCandidateSchema,
+  })
+  .strict();
+const persistedLlmReportRpcRowsSchema = z.array(persistedLlmReportRpcRowSchema).length(1);
+
+const persistedReportRowSchema = z
+  .object({
+    id: uuidSchema,
     owned_brand_id: uuidSchema,
     competitor_ids: z.array(uuidSchema).min(1).max(5),
     report_engine_version: z.string().min(1),
     report_hash: hashSchema,
     generated_at: timestampSchema,
+    generation_run_id: uuidSchema.nullable().optional().default(null),
+    payload: z.unknown(),
   })
   .strict();
 
@@ -52,13 +75,30 @@ export type CompetitiveIntelligenceReportGenerateResult =
   | { status: 'brand_not_found' }
   | { status: 'competitors_not_found' };
 
+export type ProductionCompetitiveReportGenerateResult =
+  | { status: 'ok'; report: CompetitiveReportAny }
+  | { status: 'brand_not_found' }
+  | { status: 'competitors_not_found' };
+
 export type CompetitiveIntelligenceReportLoadResult =
-  | { status: 'ok'; report: CompetitiveIntelligenceReport }
+  | { status: 'ok'; report: CompetitiveReportAny }
   | { status: 'brand_not_found' }
   | { status: 'competitors_not_found' }
   | { status: 'report_not_found' };
 
-function competitorIdsFromReport(report: CompetitiveIntelligenceReportCandidate): string[] {
+export type AuthorizedCompetitiveReportSourceState = {
+  comparison: BrandComparisonResult;
+  subjectsEvidence: SubjectSourceEvidence[];
+  signalProjection: CurrentCompetitiveSignalsProjection;
+  currentSignals: CompetitiveSignal[];
+  hypothesisProjection: CurrentStrategicHypothesesProjection;
+  experimentProjection: CurrentRecommendedExperimentsProjection;
+  deterministicCandidate: CompetitiveIntelligenceReportCandidate;
+};
+
+function competitorIdsFromReport(
+  report: CompetitiveIntelligenceReportCandidate | CompetitiveReportV2LlmCandidate,
+): string[] {
   return report.competitors.map(({ id }) => id);
 }
 
@@ -74,19 +114,30 @@ function sameInstant(left: string, right: string): boolean {
   return Date.parse(left) === Date.parse(right);
 }
 
-function hydrateReportRow(row: unknown): CompetitiveIntelligenceReport {
+function hydrateReportRow(row: unknown): CompetitiveReportAny {
   const parsed = persistedReportRowSchema.parse(row);
-  const competitorIds = competitorIdsFromReport(parsed.payload);
+  const payload =
+    parsed.report_engine_version === 'competitive-report-v1'
+      ? competitiveIntelligenceReportCandidateSchema.parse(parsed.payload)
+      : parsed.report_engine_version === 'competitive-report-v2-llm'
+        ? competitiveReportV2LlmCandidateSchema.parse(parsed.payload)
+        : (() => {
+            throw new Error('Unsupported competitive intelligence report version.');
+          })();
+  const competitorIds = competitorIdsFromReport(payload);
   if (
-    parsed.owned_brand_id !== parsed.payload.brandId ||
+    parsed.owned_brand_id !== payload.brandId ||
     !isDeepStrictEqual(parsed.competitor_ids, competitorIds) ||
-    parsed.report_engine_version !== parsed.payload.reportEngineVersion ||
-    parsed.report_hash !== parsed.payload.reportHash ||
-    !sameInstant(parsed.generated_at, parsed.payload.generatedAt)
+    parsed.report_engine_version !== payload.reportEngineVersion ||
+    parsed.report_hash !== payload.reportHash ||
+    !sameInstant(parsed.generated_at, payload.generatedAt) ||
+    (payload.reportEngineVersion === 'competitive-report-v1'
+      ? parsed.generation_run_id !== null
+      : parsed.generation_run_id === null)
   ) {
     throw new Error('Competitive intelligence report row does not match its stored payload.');
   }
-  return competitiveIntelligenceReportSchema.parse({ ...parsed.payload, id: parsed.id });
+  return competitiveReportAnySchema.parse({ ...payload, id: parsed.id });
 }
 
 function hydratePersistedReport(
@@ -136,10 +187,14 @@ async function authorizeReportScope(
   return { status: 'ok' };
 }
 
-export async function generateCompetitiveIntelligenceReport(
+export async function loadAuthorizedCompetitiveReportSourceState(
   supabase: SupabaseClient,
   input: { brandId: string; competitorIds: string[]; generatedAt: string },
-): Promise<CompetitiveIntelligenceReportGenerateResult> {
+): Promise<
+  | { status: 'ok'; value: AuthorizedCompetitiveReportSourceState }
+  | { status: 'brand_not_found' }
+  | { status: 'competitors_not_found' }
+> {
   const competitorIds = normalizeCompetitorIds(input.competitorIds);
   const scopedInput = { ...input, competitorIds };
   const loaded = await loadBrandComparison(supabase, scopedInput);
@@ -191,7 +246,7 @@ export async function generateCompetitiveIntelligenceReport(
     }),
   );
 
-  const candidate = competitiveIntelligenceReportCandidateSchema.parse(
+  const deterministicCandidate = competitiveIntelligenceReportCandidateSchema.parse(
     composeCompetitiveIntelligenceReport({
       comparison: loaded.value.comparison,
       signalProjection,
@@ -201,13 +256,76 @@ export async function generateCompetitiveIntelligenceReport(
       generatedAt: input.generatedAt,
     }),
   );
+  return {
+    status: 'ok',
+    value: {
+      comparison: loaded.value.comparison,
+      subjectsEvidence: loaded.value.subjectsEvidence,
+      signalProjection,
+      currentSignals,
+      hypothesisProjection,
+      experimentProjection,
+      deterministicCandidate,
+    },
+  };
+}
+
+export async function persistDeterministicCompetitiveReport(
+  candidate: CompetitiveIntelligenceReportCandidate,
+): Promise<CompetitiveIntelligenceReport> {
   const { createInternalSupabaseAdminClient } = await import('./supabase-admin');
   const admin = createInternalSupabaseAdminClient();
   const { data, error } = await admin.rpc('persist_competitive_intelligence_report', {
     p_report: candidate,
   });
   if (error) throw new Error(error.message);
-  return { status: 'ok', report: hydratePersistedReport(candidate, data) };
+  return hydratePersistedReport(candidate, data);
+}
+
+export async function persistLlmCompetitiveReport(
+  candidate: CompetitiveReportV2LlmCandidate,
+  generationRunId: string,
+): Promise<CompetitiveReportAny> {
+  const parsedCandidate = competitiveReportV2LlmCandidateSchema.parse(candidate);
+  const { createInternalSupabaseAdminClient } = await import('./supabase-admin');
+  const admin = createInternalSupabaseAdminClient();
+  const { data, error } = await admin.rpc('persist_competitive_intelligence_report_v2_llm', {
+    p_generation_run_id: uuidSchema.parse(generationRunId),
+    p_report: parsedCandidate,
+  });
+  if (error) throw new Error(error.message);
+  const [row] = persistedLlmReportRpcRowsSchema.parse(data);
+  if (
+    row.generation_run_id !== generationRunId ||
+    row.payload.reportHash !== parsedCandidate.reportHash ||
+    !isDeepStrictEqual({ ...row.payload, generatedAt: parsedCandidate.generatedAt }, parsedCandidate)
+  ) {
+    throw new Error('LLM report persistence returned a mismatched result.');
+  }
+  return competitiveReportV2LlmSchema.parse({ ...row.payload, id: row.id });
+}
+
+export async function generateDeterministicCompetitiveIntelligenceReport(
+  supabase: SupabaseClient,
+  input: { brandId: string; competitorIds: string[]; generatedAt: string },
+): Promise<CompetitiveIntelligenceReportGenerateResult> {
+  const loaded = await loadAuthorizedCompetitiveReportSourceState(supabase, input);
+  if (loaded.status !== 'ok') return loaded;
+  return {
+    status: 'ok',
+    report: await persistDeterministicCompetitiveReport(loaded.value.deterministicCandidate),
+  };
+}
+
+export async function generateCompetitiveIntelligenceReport(
+  supabase: SupabaseClient,
+  input: { brandId: string; competitorIds: string[]; generatedAt: string },
+): Promise<ProductionCompetitiveReportGenerateResult> {
+  if (!process.env.RIVALLENS_INTELLIGENCE_PRIMARY_PROVIDER) {
+    return generateDeterministicCompetitiveIntelligenceReport(supabase, input);
+  }
+  const runtime = await import('./llm-report-runtime');
+  return runtime.generateCompetitiveIntelligenceReport(supabase, input);
 }
 
 export async function loadLatestCompetitiveIntelligenceReport(
@@ -221,7 +339,7 @@ export async function loadLatestCompetitiveIntelligenceReport(
   const { data, error } = await supabase
     .from('competitive_intelligence_reports')
     .select(
-      'id, owned_brand_id, competitor_ids, report_engine_version, report_hash, generated_at, payload',
+      'id, owned_brand_id, competitor_ids, report_engine_version, report_hash, generated_at, generation_run_id, payload',
     )
     .eq('owned_brand_id', input.brandId)
     .eq('competitor_ids', postgresUuidArray(competitorIds))
@@ -244,7 +362,7 @@ export async function loadCompetitiveIntelligenceReport(
   const { data, error } = await supabase
     .from('competitive_intelligence_reports')
     .select(
-      'id, owned_brand_id, competitor_ids, report_engine_version, report_hash, generated_at, payload',
+      'id, owned_brand_id, competitor_ids, report_engine_version, report_hash, generated_at, generation_run_id, payload',
     )
     .eq('owned_brand_id', input.brandId)
     .eq('id', input.reportId)
