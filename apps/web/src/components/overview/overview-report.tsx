@@ -34,6 +34,15 @@ export function OverviewReport({
         <GenerationNotice notice={report.generationNotice} competitorIds={competitorIds} />
       ) : null}
 
+      {report.briefing ? (
+        <section className="mb-8 rounded-xl border border-rl-border bg-white p-6" aria-label="Executive briefing">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-rl-faint">Executive briefing</p>
+          <h2 className="mt-2 text-xl font-semibold text-rl-ink">{report.briefing.headline}</h2>
+          <p className="mt-3 text-sm leading-6 text-rl-muted">{report.briefing.summary}</p>
+          <p className="mt-3 text-sm font-medium text-rl-ink">{report.briefing.keyTakeaway}</p>
+        </section>
+      ) : null}
+
       {report.insufficient ? (
         <InsufficientReport insufficient={report.insufficient} />
       ) : (

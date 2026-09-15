@@ -226,6 +226,7 @@ export const persistedLlmHypothesisPayloadSchema = z
     hypothesisHash: hash,
   })
   .strict();
+export type PersistedLlmHypothesisPayload = z.infer<typeof persistedLlmHypothesisPayloadSchema>;
 
 export const persistedLlmExperimentPayloadSchema = z
   .object({
@@ -266,6 +267,7 @@ export const persistedLlmExperimentPayloadSchema = z
     (experiment) => !experiment.guardrailMetrics.includes(experiment.primaryMetric),
     'Guardrail metrics must not include the primary metric',
   );
+export type PersistedLlmExperimentPayload = z.infer<typeof persistedLlmExperimentPayloadSchema>;
 
 export const persistedLlmExecutiveBriefingPayloadSchema = z
   .object({
@@ -278,6 +280,9 @@ export const persistedLlmExecutiveBriefingPayloadSchema = z
     generationProvenance: llmGenerationProvenanceSchema,
   })
   .strict();
+export type PersistedLlmExecutiveBriefingPayload = z.infer<
+  typeof persistedLlmExecutiveBriefingPayloadSchema
+>;
 
 // Exact JSON payload accepted by public.persist_llm_intelligence_generation(jsonb).
 export const llmIntelligencePersistencePayloadSchema = z

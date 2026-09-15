@@ -4,6 +4,7 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts",
+    "./server": "./src/server.ts",
     "./providers": "./src/providers/index.ts",
     "./providers/anthropic": "./src/providers/anthropic.ts",
     "./providers/openai": "./src/providers/openai.ts",

@@ -384,7 +384,7 @@ export function enrichObservedChanges(input: {
   });
 }
 
-async function loadRecentObservedChanges(
+export async function loadRecentObservedChanges(
   supabase: SupabaseClient,
   input: {
     subjectsEvidence: SubjectSourceEvidence[];

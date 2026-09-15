@@ -8,7 +8,9 @@
  */
 import completeReportJson from '../../../../../docs/examples/competitive-report.json';
 import {
+  competitiveReportAnySchema,
   competitiveIntelligenceReportSchema,
+  type CompetitiveReportAny,
   type CompetitiveIntelligenceReport,
 } from '@rivallens/schemas';
 import type { EvidenceDrawerView } from './provenance-types';
@@ -22,6 +24,8 @@ export const PREVIEW_STATES = [
   'generation-required',
   'unresolved',
   'empty-section',
+  'llm-complete',
+  'llm-partial',
   'no-report',
   'loading',
   'error',
@@ -42,6 +46,10 @@ type RawReport = typeof completeReportJson;
 
 function parse(report: unknown): CompetitiveIntelligenceReport {
   return competitiveIntelligenceReportSchema.parse(report);
+}
+
+function parseAny(report: unknown): CompetitiveReportAny {
+  return competitiveReportAnySchema.parse(report);
 }
 
 function clone(): RawReport {
@@ -216,16 +224,139 @@ function emptySectionReport(): CompetitiveIntelligenceReport {
   return parse(report);
 }
 
-const REPORTS: Record<string, () => CompetitiveIntelligenceReport> = {
+function llmReport(partial: boolean): CompetitiveReportAny {
+  const report = completeReport();
+  const hypothesisId = report.sourceIntelligence.hypothesisIds[1]!;
+  const experimentId = report.sourceIntelligence.experimentIds[0]!;
+  const sourceHypothesis = report.sections.appearsToBeWorking[0]!;
+  const sourceExperiment = report.sections.whatToTestNext[0]!;
+  const claimReference = {
+    kind: 'comparison' as const,
+    comparisonKey: sourceHypothesis.provenance.signals[0]!.comparisonKey,
+    competitorId: sourceHypothesis.competitorId,
+    subjectId: sourceHypothesis.competitorId,
+    assertion: 'fact' as const,
+    claimedEpistemicClass: 'observed' as const,
+  };
+  return parseAny({
+    id: partial
+      ? '33333333-3333-4333-8333-333333333335'
+      : '33333333-3333-4333-8333-333333333334',
+    brandId: report.brandId,
+    generatedAt: report.generatedAt,
+    reportEngineVersion: 'competitive-report-v2-llm',
+    reportHash: partial ? `sha256:${'c'.repeat(64)}` : `sha256:${'b'.repeat(64)}`,
+    sourceStateHash: report.sourceStateHash,
+    competitors: report.competitors,
+    sourceIntelligence: {
+      signalIds: report.sourceIntelligence.signalIds,
+      hypothesisIds: [hypothesisId],
+      experimentIds: [experimentId],
+      executiveBriefingId: '33333333-3333-4333-8333-333333333336',
+    },
+    generation: { result: partial ? 'llm_partial' : 'llm' },
+    executiveBriefing: {
+      headline: 'A rival may be reducing purchase friction',
+      strategicPostureSummary:
+        'Observed policy differences support a controlled shipping-threshold test.',
+      keyTakeaway: 'Treat the pattern as a testable signal, not a proven outcome.',
+      supportingHypothesisIds: [hypothesisId],
+      claimReferences: [claimReference],
+      numericClaims: [],
+    },
+    completeness: {
+      state: partial ? 'partial' : 'complete',
+      comparisonUnknown: partial
+        ? [unknownComparison('policy.guarantee_duration')]
+        : [],
+      signals: {
+        unresolved: partial
+          ? [unresolvedSignal('policy.guarantee_duration', 'relative_numeric')]
+          : [],
+      },
+      sections: {
+        yourAdvantages: { state: 'supported', available: 1, omitted: 0 },
+        competitorAdvantages: { state: 'supported', available: 2, omitted: 0 },
+        appearsToBeWorking: { state: 'supported', available: 1, omitted: 0 },
+        whatToTestNext: { state: 'supported', available: 1, omitted: 0 },
+      },
+    },
+    sections: {
+      yourAdvantages: report.sections.yourAdvantages,
+      competitorAdvantages: report.sections.competitorAdvantages,
+      appearsToBeWorking: [
+        {
+          itemType: 'strategic_hypothesis',
+          title: sourceHypothesis.title,
+          statement: sourceHypothesis.statement,
+          competitorId: sourceHypothesis.competitorId,
+          competitorName: sourceHypothesis.competitorName,
+          confidence: sourceHypothesis.confidence,
+          theme: 'shipping_friction',
+          rationale: 'Observed policy evidence and a derived signal justify testing this possibility.',
+          uncertainty: sourceHypothesis.uncertainty,
+          assumptions: ['The visible shipping policy applies to comparable customer segments.'],
+          epistemicClassDependencies: ['observed', 'derived'],
+          claimReferences: [claimReference],
+          numericClaims: [],
+          provenance: {
+            ...sourceHypothesis.provenance,
+            hypotheses: [{ hypothesisId, supportingSignalIds: sourceHypothesis.provenance.signals.map(({ signalId }) => signalId) }],
+          },
+        },
+      ],
+      whatToTestNext: [
+        {
+          itemType: 'recommended_experiment',
+          title: sourceExperiment.title,
+          statement: sourceExperiment.statement,
+          competitorId: sourceExperiment.competitorId,
+          competitorName: sourceExperiment.competitorName,
+          hypothesisUnderTest: 'A lower threshold may improve checkout completion.',
+          variableUnderTest: 'free_shipping_threshold',
+          design: {
+            comparison: 'control_vs_treatment',
+            variablePolicy: 'single_variable',
+            controlDescription: 'Keep the current shipping threshold.',
+            treatmentDescription: 'Show one safely selected lower threshold.',
+          },
+          primaryMetric: 'checkout_conversion_rate',
+          guardrailMetrics: ['contribution_margin_per_order', 'shipping_cost_per_order'],
+          implementationNotes: ['Keep all non-target checkout elements constant.'],
+          caveat: {
+            category: 'shipping_margin_exposure',
+            statement: 'A lower threshold may increase shipping subsidy.',
+          },
+          claimReferences: [claimReference],
+          numericClaims: [],
+          provenance: {
+            signals: sourceExperiment.provenance.signals,
+            hypotheses: [{ hypothesisId, supportingSignalIds: sourceExperiment.provenance.signals.map(({ signalId }) => signalId) }],
+            experiments: [{ experimentId, sourceHypothesisIds: [hypothesisId] }],
+          },
+        },
+      ],
+    },
+  });
+}
+
+const REPORTS: Record<string, () => CompetitiveReportAny> = {
   complete: completeReport,
   partial: partialReport,
   insufficient: insufficientReport,
   'generation-required': generationRequiredReport,
   unresolved: unresolvedReport,
   'empty-section': emptySectionReport,
+  'llm-complete': () => llmReport(false),
+  'llm-partial': () => llmReport(true),
 };
 
-export function previewReport(state: PreviewState): CompetitiveIntelligenceReport | null {
+export function previewReport(
+  state: Exclude<PreviewState, 'llm-complete' | 'llm-partial' | 'no-report' | 'loading' | 'error'>,
+): CompetitiveIntelligenceReport;
+export function previewReport(state: 'llm-complete' | 'llm-partial'): CompetitiveReportAny;
+export function previewReport(state: PreviewState): CompetitiveReportAny | null;
+export function previewReport(state: PreviewState): CompetitiveReportAny | null {
   return REPORTS[state]?.() ?? null;
 }
 
@@ -235,8 +366,8 @@ export const PREVIEW_NOW = Date.parse('2026-09-04T14:00:00.000Z');
 export const PREVIEW_CAPTURED_PAGE_TYPES = ['Homepage', 'Product page'];
 
 /** Fixed captured records, shared with the production provenance presentation. */
-export function previewEvidence(report: CompetitiveIntelligenceReport): {
-  report: CompetitiveIntelligenceReport;
+export function previewEvidence<TReport extends CompetitiveReportAny>(report: TReport): {
+  report: TReport;
   evidence: ReferencedEvidence;
 } {
   const copy = structuredClone(report);
@@ -309,7 +440,7 @@ export function previewEvidence(report: CompetitiveIntelligenceReport): {
 }
 
 export function previewDrawers(
-  report: CompetitiveIntelligenceReport,
+  report: CompetitiveReportAny,
 ): Record<string, EvidenceDrawerView> {
   const fixture = previewEvidence(report);
   return buildReportProvenance(fixture.report, fixture.evidence);

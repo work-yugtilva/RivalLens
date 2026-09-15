@@ -3,8 +3,8 @@ import { extractPerRunMetrics } from '../../packages/eval/src/metrics/perRun';
 import { fixtureById, runMock } from './helpers/harness';
 
 async function metricsFor(fixtureId: string, scenario: Parameters<typeof runMock>[1]) {
-  const { result, timings } = await runMock(fixtureById(fixtureId), scenario);
-  return { result, metrics: extractPerRunMetrics(result, timings) };
+  const { result, attempts, timings } = await runMock(fixtureById(fixtureId), scenario);
+  return { result, metrics: extractPerRunMetrics(result, attempts, timings) };
 }
 
 describe('per-run deterministic metrics', () => {

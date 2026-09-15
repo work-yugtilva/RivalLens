@@ -16,6 +16,7 @@
     "paths": {
       "@/*": ["apps/web/src/*"],
       "@rivallens/ai": ["packages/ai/src/index.ts"],
+      "@rivallens/ai/server": ["packages/ai/src/server.ts"],
       "@rivallens/ai/providers": ["packages/ai/src/providers/index.ts"],
       "@rivallens/ai/providers/*": ["packages/ai/src/providers/*"],
       "@rivallens/connectors": ["packages/connectors/src/index.ts"],

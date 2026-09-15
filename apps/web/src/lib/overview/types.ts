@@ -127,6 +127,7 @@ export type InsufficientView = {
 };
 
 export type ReportView = {
+  briefing?: { headline: string; summary: string; keyTakeaway: string } | null;
   status: ReportStatusView;
   notice: CompletenessNoticeView | null;
   generationNotice: GenerationNoticeView | null;

@@ -13,6 +13,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -823,6 +824,9 @@ export const competitiveIntelligenceReports = pgTable(
     index('competitive_intelligence_reports_generation_run_id_idx')
       .on(table.generationRunId)
       .where(sql`${table.generationRunId} is not null`),
+    uniqueIndex('competitive_intelligence_reports_generation_run_id_key')
+      .on(table.generationRunId)
+      .where(sql`${table.generationRunId} is not null`),
     index('competitive_intelligence_reports_latest_scope_idx').on(
       table.ownedBrandId,
       table.competitorIds,
@@ -848,13 +852,6 @@ export const competitiveIntelligenceReports = pgTable(
     check(
       'competitive_intelligence_reports_payload_valid',
       sql`jsonb_typeof(${table.payload}) = 'object'
-        and ${table.payload} ?& array[
-          'brandId', 'generatedAt', 'reportEngineVersion', 'reportHash', 'sourceStateHash',
-          'competitors', 'sourceIntelligence', 'completeness', 'sections'
-        ]
-        and ${table.payload} - 'brandId' - 'generatedAt' - 'reportEngineVersion' - 'reportHash'
-          - 'sourceStateHash' - 'competitors' - 'sourceIntelligence' - 'completeness' - 'sections'
-          = '{}'::jsonb
         and (${table.payload} ->> 'brandId')::uuid = ${table.ownedBrandId}
         and (${table.payload} ->> 'generatedAt')::timestamptz = ${table.generatedAt}
         and ${table.payload} ->> 'reportEngineVersion' = ${table.reportEngineVersion}
@@ -876,7 +873,20 @@ export const competitiveIntelligenceReports = pgTable(
         and jsonb_typeof(${table.payload} #> '{sections,appearsToBeWorking}') = 'array'
         and jsonb_array_length(${table.payload} #> '{sections,appearsToBeWorking}') <= 3
         and jsonb_typeof(${table.payload} #> '{sections,whatToTestNext}') = 'array'
-        and jsonb_array_length(${table.payload} #> '{sections,whatToTestNext}') <= 3`,
+        and jsonb_array_length(${table.payload} #> '{sections,whatToTestNext}') <= 3
+        and (
+          (${table.reportEngineVersion} = 'competitive-report-v1'
+            and ${table.generationRunId} is null
+            and ${table.payload} - 'brandId' - 'generatedAt' - 'reportEngineVersion' - 'reportHash'
+              - 'sourceStateHash' - 'competitors' - 'sourceIntelligence' - 'completeness' - 'sections'
+              = '{}'::jsonb)
+          or
+          (${table.reportEngineVersion} = 'competitive-report-v2-llm'
+            and ${table.generationRunId} is not null
+            and ${table.payload} - 'brandId' - 'generatedAt' - 'reportEngineVersion' - 'reportHash'
+              - 'sourceStateHash' - 'competitors' - 'sourceIntelligence' - 'generation'
+              - 'executiveBriefing' - 'completeness' - 'sections' = '{}'::jsonb)
+        )`,
     ),
   ],
 );

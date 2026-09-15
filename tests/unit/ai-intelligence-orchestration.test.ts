@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as ai from '../../packages/ai/src';
+import { orchestrateIntelligenceTrusted } from '../../packages/ai/src/orchestration';
 import {
   buildIntelligenceContext,
   generateStrategicHypotheses,
@@ -405,5 +406,66 @@ describe('orchestrateIntelligence onAttemptDebug (eval/debug-only hook)', () => 
 
     expect(withThrowingHook).toEqual(baseline);
     expect(withThrowingHook).not.toHaveProperty('rawOutput');
+  });
+});
+
+describe('production persistence attempt capture', () => {
+  it('keeps the trusted capture runner out of the ordinary package surface', () => {
+    expect(ai).not.toHaveProperty('orchestrateIntelligenceTrusted');
+    expect(ai).not.toHaveProperty('orchestrateIntelligenceForPersistence');
+  });
+
+  it.each([
+    {
+      scenarios: ['unknown_evidence_id', 'valid'] as const,
+      retryReason: 'validation_repair',
+      firstHasRawOutput: true,
+    },
+    {
+      scenarios: ['timeout', 'valid'] as const,
+      retryReason: 'transport',
+      firstHasRawOutput: false,
+    },
+  ])('captures $retryReason attempts without changing the safe result', async (testCase) => {
+    const { context, currentSignals } = fixture();
+    const Provider = ai.DeterministicMockIntelligenceProvider;
+    const trusted = await orchestrateIntelligenceTrusted({
+      context,
+      contextHash: intelligenceContextHash(context),
+      provider: new Provider(testCase.scenarios),
+      promptVersion: 'production-capture-test',
+      systemPrompt: 'Return the requested structured intelligence synthesis.',
+      deterministicFallback: deterministicFallback(currentSignals),
+    });
+
+    expect(trusted.result.status).toBe('llm_success');
+    expect(trusted.persistenceAttempts).toHaveLength(2);
+    if (testCase.firstHasRawOutput) {
+      expect(trusted.persistenceAttempts[0]).toHaveProperty('rawOutput', expect.any(Object));
+    }
+    if (!testCase.firstHasRawOutput) {
+      expect(trusted.persistenceAttempts[0]).not.toHaveProperty('rawOutput');
+      expect(trusted.persistenceAttempts[0]).not.toHaveProperty('telemetry');
+      expect(trusted.persistenceAttempts[0]).toMatchObject({ providerFailure: 'timeout' });
+    }
+    expect(trusted.persistenceAttempts[1]).toMatchObject({
+      attemptNumber: 2,
+      kind: 'retry',
+      retryReason: testCase.retryReason,
+      rawOutput: { value: expect.any(Object) },
+    });
+    expect(trusted.persistenceAttempts[1]!.promptVersion).toBe(
+      testCase.retryReason === 'validation_repair'
+        ? 'production-capture-test:repair-v1'
+        : 'production-capture-test',
+    );
+    expect(trusted.frozenContext).toBeDefined();
+    expect(Object.isFrozen(trusted.frozenContext)).toBe(true);
+    const publicResult = JSON.stringify(trusted.result);
+    expect(publicResult).not.toContain('rawOutput');
+    expect(publicResult).not.toContain('rawResponseId');
+    expect(publicResult).not.toContain('providerRequestId');
+    expect(publicResult).not.toContain('telemetry');
+    expect(publicResult).not.toContain('errorCodes');
   });
 });

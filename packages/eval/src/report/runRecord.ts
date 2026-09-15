@@ -3,7 +3,7 @@ import type { BenchmarkResult, BenchmarkRunRecord } from '../runner/runSuite';
 
 // Machine-readable artifacts. No raw model output, no prompt/system text, no snippet or
 // competitor text ever reaches these files — BenchmarkRunRecord already carries only
-// SafeAttemptSummary telemetry and numeric metrics.
+// Evaluation-only attempt telemetry and numeric metrics.
 export function serializeRunsJsonl(runs: readonly BenchmarkRunRecord[]): string {
   return stableJsonl(runs);
 }

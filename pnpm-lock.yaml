@@ -20,6 +20,9 @@ importers:
       '@playwright/test':
         specifier: ^1.63.0
         version: 1.63.0
+      '@supabase/supabase-js':
+        specifier: ^2.57.0
+        version: 2.112.4
       '@types/node':
         specifier: ^20.17.30
         version: 20.19.43
@@ -56,6 +59,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@rivallens/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@rivallens/connectors':
         specifier: workspace:*
         version: link:../../packages/connectors

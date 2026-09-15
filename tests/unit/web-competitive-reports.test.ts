@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CompetitiveIntelligenceReportCandidate } from '../../packages/schemas/src';
+import { previewReport } from '../../apps/web/src/lib/overview/preview-fixtures';
 import { reportInput, BRAND_ID, COMPETITOR_ID, GENERATED_AT, uuid } from './fixtures/competitive-reports';
 
 const mocks = vi.hoisted(() => ({
@@ -239,20 +240,34 @@ describe('competitive report snapshot lifecycle', () => {
     expect((await byId(first.id)).status).toBe(404);
   });
 
-  it('returns immutable history created by a later report engine', async () => {
+  it('fails closed for an unsupported historical report engine', async () => {
     const first = await (await post()).json();
     const row = tables.competitive_intelligence_reports![0]!;
     row.report_engine_version = 'competitive-report-v2';
     row.generated_at = '2026-09-04T08:00:00-04:00';
     (row.payload as Record<string, unknown>).reportEngineVersion = 'competitive-report-v2';
-    expect(await (await latest()).json()).toMatchObject({
-      id: first.id,
-      reportEngineVersion: 'competitive-report-v2',
-    });
-    expect(await (await byId(first.id)).json()).toMatchObject({
-      id: first.id,
-      reportEngineVersion: 'competitive-report-v2',
-    });
+    expect((await latest()).status).toBe(500);
+    expect((await byId(first.id)).status).toBe(500);
+  });
+
+  it('hydrates v2 history through its explicit parser without exposing its generation run', async () => {
+    const report = previewReport('llm-complete');
+    const generationRunId = uuid(650);
+    tables.competitive_intelligence_reports = [{
+      id: report.id,
+      owned_brand_id: report.brandId,
+      competitor_ids: report.competitors.map(({ id }) => id),
+      report_engine_version: report.reportEngineVersion,
+      report_hash: report.reportHash,
+      generated_at: report.generatedAt,
+      generation_run_id: generationRunId,
+      payload: Object.fromEntries(Object.entries(report).filter(([key]) => key !== 'id')),
+    }];
+
+    const loaded = await (await latest()).json();
+    expect(loaded).toMatchObject({ id: report.id, reportEngineVersion: 'competitive-report-v2-llm' });
+    expect(loaded).not.toHaveProperty('generationRunId');
+    expect(JSON.stringify(loaded)).not.toContain(generationRunId);
   });
 
   it('snapshots generation gaps without creating upstream intelligence', async () => {

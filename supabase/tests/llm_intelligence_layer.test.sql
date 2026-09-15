@@ -1,6 +1,6 @@
 begin;
 
-select plan(74);
+select plan(85);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -774,18 +774,65 @@ returns jsonb language sql as $$
   );
 $$;
 
+create function pg_temp.llm_report_payload(report_hash text)
+returns jsonb language sql as $$
+  select jsonb_build_object(
+    'brandId', 'bbbbbbbb-0000-0000-0000-000000000001',
+    'generatedAt', '2026-09-04T13:00:00.000Z',
+    'reportEngineVersion', 'competitive-report-v2-llm',
+    'reportHash', report_hash,
+    'sourceStateHash', 'sha256:' || repeat('a', 64),
+    'competitors', jsonb_build_array(jsonb_build_object(
+      'id', 'cccccccc-0000-0000-0000-000000000001', 'name', 'competitor-one.test'
+    )),
+    'sourceIntelligence', jsonb_build_object(
+      'signalIds', to_jsonb(array['dddddddd-0000-0000-0000-000000000001']::uuid[]),
+      'hypothesisIds', (
+        select to_jsonb(array_agg(id order by id)) from public.llm_strategic_hypotheses
+        where generation_run_id = 'eeeeeeee-0000-4000-8000-000000000001'
+      ),
+      'experimentIds', (
+        select to_jsonb(array_agg(id order by id)) from public.llm_recommended_experiments
+        where generation_run_id = 'eeeeeeee-0000-4000-8000-000000000001'
+      ),
+      'executiveBriefingId', (
+        select id from public.llm_executive_briefings
+        where generation_run_id = 'eeeeeeee-0000-4000-8000-000000000001'
+      )
+    ),
+    'generation', jsonb_build_object('result', 'llm'),
+    'executiveBriefing', jsonb_build_object(
+      'headline', 'A rival may be reducing purchase friction',
+      'strategicPostureSummary', 'The evidence supports testing a lower shipping threshold.',
+      'keyTakeaway', 'Treat the competitive pattern as a testable signal.',
+      'supportingHypothesisIds', (
+        select to_jsonb(array_agg(hypothesis_id order by position))
+        from public.llm_executive_briefing_hypotheses
+        where generation_run_id = 'eeeeeeee-0000-4000-8000-000000000001'
+      ),
+      'claimReferences', '[]'::jsonb,
+      'numericClaims', '[]'::jsonb
+    ),
+    'completeness', jsonb_build_object('state', 'complete'),
+    'sections', jsonb_build_object(
+      'yourAdvantages', '[]'::jsonb, 'competitorAdvantages', '[]'::jsonb,
+      'appearsToBeWorking', '[]'::jsonb, 'whatToTestNext', '[]'::jsonb
+    )
+  );
+$$;
+
 select throws_like(
   $$ insert into public.competitive_intelligence_reports (
        owned_brand_id, competitor_ids, report_engine_version, report_hash, generated_at, payload, generation_run_id
      ) values (
-       'bbbbbbbb-0000-0000-0000-000000000002', array['cccccccc-0000-0000-0000-000000000003']::uuid[],
+       'bbbbbbbb-0000-0000-0000-000000000001', array['cccccccc-0000-0000-0000-000000000001']::uuid[],
        'competitive-report-v1', 'sha256:' || repeat('5', 64), '2026-09-04T13:00:00Z',
-       pg_temp.report_payload('bbbbbbbb-0000-0000-0000-000000000002', 'cccccccc-0000-0000-0000-000000000003',
-         'competitor-three.test', 'sha256:' || repeat('5', 64)),
+       pg_temp.report_payload('bbbbbbbb-0000-0000-0000-000000000001', 'cccccccc-0000-0000-0000-000000000001',
+         'competitor-one.test', 'sha256:' || repeat('5', 64)),
        'eeeeeeee-0000-4000-8000-000000000001'
      ) $$,
-  '%report generation run must belong to the report brand%',
-  'a report cannot reference another tenant''s generation run'
+  '%competitive_intelligence_reports_payload_valid%',
+  'a deterministic v1 report cannot reference a generation run'
 );
 select lives_ok(
   $$ insert into public.competitive_intelligence_reports (
@@ -795,14 +842,132 @@ select lives_ok(
        'competitive-report-v1', 'sha256:' || repeat('4', 64), '2026-09-04T13:00:00Z',
        pg_temp.report_payload('bbbbbbbb-0000-0000-0000-000000000001', 'cccccccc-0000-0000-0000-000000000001',
          'competitor-one.test', 'sha256:' || repeat('4', 64)),
-       'eeeeeeee-0000-4000-8000-000000000001'
+       null
      ) $$,
-  'a report can reference its own brand''s generation run'
+  'a deterministic v1 report remains valid without a generation run'
 );
 select throws_like(
   $$ update public.competitive_intelligence_reports set generation_run_id = null $$,
   '%competitive_intelligence_reports are append-only%',
   'report generation run references cannot be reassigned'
+);
+
+select ok(
+  has_function_privilege('service_role', 'public.persist_competitive_intelligence_report_v2_llm(uuid,jsonb)', 'EXECUTE'),
+  'service role can execute the v2 report persistence RPC'
+);
+select ok(
+  not has_function_privilege('authenticated', 'public.persist_competitive_intelligence_report_v2_llm(uuid,jsonb)', 'EXECUTE'),
+  'authenticated users cannot execute the v2 report persistence RPC'
+);
+
+set local role service_role;
+select lives_ok(
+  $$ select public.persist_competitive_intelligence_report_v2_llm(
+       'eeeeeeee-0000-4000-8000-000000000001',
+       pg_temp.llm_report_payload('sha256:' || repeat('b', 64))
+     ) $$,
+  'service role persists a v2 report over an accepted generation run'
+);
+select lives_ok(
+  $$ select public.persist_competitive_intelligence_report_v2_llm(
+       'eeeeeeee-0000-4000-8000-000000000001',
+       pg_temp.llm_report_payload('sha256:' || repeat('b', 64))
+     ) $$,
+  'v2 report finalization is idempotent by generation run'
+);
+
+set local role postgres;
+select is(
+  (select count(*) from public.competitive_intelligence_reports
+   where generation_run_id = 'eeeeeeee-0000-4000-8000-000000000001'),
+  1::bigint,
+  'one immutable report is stored for an accepted generation run'
+);
+select is(
+  (select payload #>> '{generation,result}' from public.competitive_intelligence_reports
+   where generation_run_id = 'eeeeeeee-0000-4000-8000-000000000001'),
+  'llm',
+  'the report generation classification matches the accepted run'
+);
+
+insert into public.intelligence_generation_runs (
+  id, owned_brand_id, competitor_ids, analysis_objective, context_version, intelligence_context,
+  intelligence_context_hash, context_generated_at, prompt_version, validator_contract_version,
+  provider_id, model_id, model_parameters, outcome, validation_status, validation_summary,
+  accepted_hypothesis_count, accepted_experiment_count, executive_briefing_accepted
+) values (
+  'eeeeeeee-0000-4000-8000-000000000037',
+  'bbbbbbbb-0000-0000-0000-000000000002',
+  array['cccccccc-0000-0000-0000-000000000003']::uuid[],
+  'general_overview', 'intelligence-context-v1',
+  jsonb_build_object(
+    'brand', jsonb_build_object('id', 'bbbbbbbb-0000-0000-0000-000000000002'),
+    'competitors', jsonb_build_array(jsonb_build_object('id', 'cccccccc-0000-0000-0000-000000000003')),
+    'signals', '[]'::jsonb, 'contextVersion', 'intelligence-context-v1',
+    'analysisObjective', 'general_overview', 'generatedAt', '2026-09-04T12:00:00.000Z'
+  ),
+  'sha256:' || repeat('a', 64), '2026-09-04T12:00:00Z', 'intelligence-synthesis-v1',
+  'intelligence-validator-contract-2026-09-14', 'provider-under-test', 'model-under-test', '{}',
+  'llm_success', 'passed', '{"status":"passed"}', 1, 0, false
+);
+
+set local role service_role;
+select throws_like(
+  $$ select public.persist_competitive_intelligence_report_v2_llm(
+       'eeeeeeee-0000-4000-8000-000000000037',
+       pg_temp.llm_report_payload('sha256:' || repeat('c', 64))
+     ) $$,
+  '%report generation run must belong to the report brand%',
+  'a customer cannot attach another tenant''s generation run'
+);
+select throws_like(
+  $$ select public.persist_competitive_intelligence_report_v2_llm(
+       'eeeeeeee-0000-4000-8000-000000000036',
+       pg_temp.llm_report_payload('sha256:' || repeat('d', 64))
+     ) $$,
+  '%must be accepted and match its exact source scope%',
+  'a deterministic fallback run cannot back a v2 report'
+);
+select throws_like(
+  $$ insert into public.competitive_intelligence_reports (
+       owned_brand_id, competitor_ids, report_engine_version, report_hash, generated_at,
+       payload, generation_run_id
+     )
+     select 'bbbbbbbb-0000-0000-0000-000000000001',
+       array['cccccccc-0000-0000-0000-000000000001']::uuid[],
+       'competitive-report-v2-llm', 'sha256:' || repeat('e', 64),
+       '2026-09-04T13:00:00Z', candidate.payload,
+       'eeeeeeee-0000-4000-8000-000000000001'
+     from (
+       select jsonb_set(
+         pg_temp.llm_report_payload('sha256:' || repeat('e', 64)),
+         '{sourceIntelligence,hypothesisIds}',
+         jsonb_build_array((select id from public.llm_strategic_hypotheses
+                            where generation_run_id = 'eeeeeeee-0000-4000-8000-000000000001'
+                            order by id limit 1))
+       ) payload
+     ) candidate $$,
+  '%must come from the attached accepted generation run%',
+  'a v2 report cannot omit accepted hypothesis rows from its source identity'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claim.role', 'authenticated', true);
+select set_config('request.jwt.claim.sub', '22222222-2222-2222-2222-222222222222', true);
+select is(
+  (select count(*) from public.competitive_intelligence_reports
+   where generation_run_id = 'eeeeeeee-0000-4000-8000-000000000001'),
+  0::bigint,
+  'cross-organization customers cannot read v2 reports'
+);
+select throws_like(
+  $$ select public.persist_competitive_intelligence_report_v2_llm(
+       'eeeeeeee-0000-4000-8000-000000000001',
+       pg_temp.llm_report_payload('sha256:' || repeat('f', 64))
+     ) $$,
+  '%permission denied%',
+  'browser-authenticated customers cannot invoke v2 report persistence'
 );
 
 select * from finish();

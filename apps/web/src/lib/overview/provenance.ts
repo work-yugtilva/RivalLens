@@ -3,7 +3,7 @@ import 'server-only';
 import {
   strategicHypothesisTypeSchema,
   STRATEGIC_HYPOTHESIS_CANONICAL_COPY,
-  type CompetitiveIntelligenceReport,
+  type CompetitiveReportAny,
 } from '@rivallens/schemas';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
@@ -25,9 +25,14 @@ export type ResolveProvenanceResult =
  */
 export async function resolveReportProvenance(
   supabase: SupabaseClient,
-  report: CompetitiveIntelligenceReport,
+  report: CompetitiveReportAny,
 ): Promise<ResolveProvenanceResult> {
-  const items = Object.values(report.sections).flat();
+  const items = [
+    ...report.sections.yourAdvantages,
+    ...report.sections.competitorAdvantages,
+    ...report.sections.appearsToBeWorking,
+    ...report.sections.whatToTestNext,
+  ];
   const refs = items.flatMap((item) =>
     item.provenance.signals.flatMap((signal) => signal.evidence),
   );
@@ -73,35 +78,62 @@ export async function resolveReportProvenance(
   ).filter((id) => !shownHypothesisIds.has(id));
   const meanings = new Map<string, StoredMeaning>();
   if (missingHypothesisIds.length > 0) {
-    const loaded = await supabase
-      .from('strategic_hypotheses')
-      .select('id, competitor_id, hypothesis_type, statement, uncertainty_statement')
-      .eq('owned_brand_id', report.brandId)
-      .in('id', missingHypothesisIds);
+    const loaded =
+      report.reportEngineVersion === 'competitive-report-v2-llm'
+        ? await supabase
+            .from('llm_strategic_hypotheses')
+            .select('id, competitor_id, statement, uncertainty_statement')
+            .eq('owned_brand_id', report.brandId)
+            .in('id', missingHypothesisIds)
+        : await supabase
+            .from('strategic_hypotheses')
+            .select('id, competitor_id, hypothesis_type, statement, uncertainty_statement')
+            .eq('owned_brand_id', report.brandId)
+            .in('id', missingHypothesisIds);
     if (loaded.error) throw new Error('Could not read referenced interpretation.');
-    const rows = z
-      .array(
-        z.object({
-          id: z.string().uuid(),
-          competitor_id: z.string().uuid(),
-          hypothesis_type: strategicHypothesisTypeSchema,
-          statement: z.string(),
-          uncertainty_statement: z.string(),
-        }),
-      )
-      .parse(loaded.data ?? []);
-    for (const row of rows) {
-      const canonical = STRATEGIC_HYPOTHESIS_CANONICAL_COPY[row.hypothesis_type];
-      if (
-        row.statement !== canonical.statement ||
-        row.uncertainty_statement !== canonical.uncertainty.statement
-      )
-        continue;
-      meanings.set(row.id, {
-        competitorId: row.competitor_id,
-        statement: row.statement,
-        uncertainty: row.uncertainty_statement,
-      });
+    if (report.reportEngineVersion === 'competitive-report-v2-llm') {
+      const rows = z
+        .array(
+          z.object({
+            id: z.string().uuid(),
+            competitor_id: z.string().uuid(),
+            statement: z.string().min(1),
+            uncertainty_statement: z.string().min(1),
+          }),
+        )
+        .parse(loaded.data ?? []);
+      for (const row of rows) {
+        meanings.set(row.id, {
+          competitorId: row.competitor_id,
+          statement: row.statement,
+          uncertainty: row.uncertainty_statement,
+        });
+      }
+    } else {
+      const rows = z
+        .array(
+          z.object({
+            id: z.string().uuid(),
+            competitor_id: z.string().uuid(),
+            hypothesis_type: strategicHypothesisTypeSchema,
+            statement: z.string(),
+            uncertainty_statement: z.string(),
+          }),
+        )
+        .parse(loaded.data ?? []);
+      for (const row of rows) {
+        const canonical = STRATEGIC_HYPOTHESIS_CANONICAL_COPY[row.hypothesis_type];
+        if (
+          row.statement !== canonical.statement ||
+          row.uncertainty_statement !== canonical.uncertainty.statement
+        )
+          continue;
+        meanings.set(row.id, {
+          competitorId: row.competitor_id,
+          statement: row.statement,
+          uncertainty: row.uncertainty_statement,
+        });
+      }
     }
   }
   return {

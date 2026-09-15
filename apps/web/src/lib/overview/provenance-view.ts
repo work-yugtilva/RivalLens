@@ -1,6 +1,6 @@
 import type {
   BrandComparisonResult,
-  CompetitiveIntelligenceReport,
+  CompetitiveReportAny,
   ComparisonFact,
   ComparisonSubjectValue,
 } from '@rivallens/schemas';
@@ -30,7 +30,7 @@ const HEADING = 'Why RivalLens is telling you this';
 const EVIDENCE_UNAVAILABLE =
   'The captured evidence behind this finding is no longer available to display.';
 
-type ReportSections = CompetitiveIntelligenceReport['sections'];
+type ReportSections = CompetitiveReportAny['sections'];
 type ReportItem =
   | ReportSections['yourAdvantages'][number]
   | ReportSections['appearsToBeWorking'][number]
@@ -42,7 +42,7 @@ export type ReportProvenance = Record<string, EvidenceDrawerView>;
 export type StoredMeaning = { competitorId: string; statement: string; uncertainty: string };
 
 export function buildReportProvenance(
-  report: CompetitiveIntelligenceReport,
+  report: CompetitiveReportAny,
   records: ReferencedEvidence,
   meanings: Map<string, StoredMeaning> = new Map(),
 ): ReportProvenance {
@@ -68,7 +68,7 @@ export function buildReportProvenance(
 }
 
 export function unavailableReportProvenance(
-  report: CompetitiveIntelligenceReport,
+  report: CompetitiveReportAny,
 ): ReportProvenance {
   return buildReportProvenance(report, {
     ownedDomain: 'Your brand',
@@ -79,7 +79,7 @@ export function unavailableReportProvenance(
 }
 
 function buildDrawer(input: {
-  report: CompetitiveIntelligenceReport;
+  report: CompetitiveReportAny;
   item: ReportItem;
   section: CompetitiveReportSectionName;
   itemKey: string;
@@ -154,7 +154,7 @@ function buildDrawer(input: {
 }
 
 function buildMeaningStep(
-  report: CompetitiveIntelligenceReport,
+  report: CompetitiveReportAny,
   item: ReportItem,
   meanings: Map<string, StoredMeaning>,
 ): ProvenanceStepView | null {

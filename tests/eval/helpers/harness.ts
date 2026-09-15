@@ -36,7 +36,7 @@ export async function runMock(
 ) {
   const provider = new DeterministicMockIntelligenceProvider(scenario);
   const run = await runFixtureModel({ fixture, provider });
-  return { provider, result: run.result, timings: run.timings };
+  return { provider, result: run.result, attempts: run.attempts, timings: run.timings };
 }
 
 export async function runMockSuite(

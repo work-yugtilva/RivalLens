@@ -1,7 +1,8 @@
-import type { IntelligenceOrchestrationResult, SafeAttemptSummary } from '@rivallens/ai';
+import type { IntelligenceOrchestrationResult } from '@rivallens/ai';
 import type { IntelligenceValidationErrorCode } from '@rivallens/intelligence';
 import { categoryOf, type MetricCategory } from './mapping';
 import type { RunTimings } from '../runner/runFixtureModel';
+import type { EvaluationAttemptSummary } from '../runner/runFixtureModel';
 
 export type TerminalValidatorStatus = 'passed' | 'partial' | 'failed' | null;
 
@@ -38,7 +39,7 @@ export type PerRunMetrics = {
 };
 
 function sumTokens(
-  attempts: readonly SafeAttemptSummary[],
+  attempts: readonly EvaluationAttemptSummary[],
   field: 'inputTokens' | 'outputTokens' | 'totalTokens',
 ): number | null {
   let total = 0;
@@ -53,7 +54,9 @@ function sumTokens(
   return sawTelemetry ? total : null;
 }
 
-function terminalAttempt(attempts: readonly SafeAttemptSummary[]): SafeAttemptSummary | undefined {
+function terminalAttempt(
+  attempts: readonly EvaluationAttemptSummary[],
+): EvaluationAttemptSummary | undefined {
   for (let index = attempts.length - 1; index >= 0; index -= 1) {
     if (attempts[index]!.validation) return attempts[index];
   }
@@ -75,9 +78,9 @@ function categoryCount(
 
 export function extractPerRunMetrics(
   result: IntelligenceOrchestrationResult,
+  attempts: readonly EvaluationAttemptSummary[],
   timings: RunTimings,
 ): PerRunMetrics {
-  const attempts = result.attempts;
   const providerInvocationCount = attempts.length;
   const repairTriggered = attempts.some(
     (attempt) => attempt.kind === 'retry' && attempt.retryReason === 'validation_repair',

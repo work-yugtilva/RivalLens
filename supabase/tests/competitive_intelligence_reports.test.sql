@@ -190,13 +190,13 @@ select is(
   'sha256:bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc',
   'a changed source state with a new hash creates a new report snapshot'
 );
-select is(
-  (select (public.persist_competitive_intelligence_report(jsonb_set(
+select throws_like(
+  $$ select public.persist_competitive_intelligence_report(jsonb_set(
     jsonb_set(current_setting('test.report_payload')::jsonb, '{reportHash}', '"sha256:cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"'),
     '{reportEngineVersion}', '"competitive-report-v2"'
-  ))).payload ->> 'reportEngineVersion'),
-  'competitive-report-v2',
-  'a new report engine version can coexist with prior report history'
+  )) $$,
+  '%competitive_intelligence_reports_payload_valid%',
+  'unsupported report engine versions fail closed'
 );
 select is(
   (select jsonb_array_length((public.persist_competitive_intelligence_report(jsonb_set(
@@ -211,12 +211,12 @@ select is(
 );
 
 set local role postgres;
-select is((select count(*) from public.competitive_intelligence_reports), 4::bigint, 'distinct report identities remain immutable history');
+select is((select count(*) from public.competitive_intelligence_reports), 3::bigint, 'distinct report identities remain immutable history');
 
 set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
-select is((select count(*) from public.competitive_intelligence_reports), 4::bigint, 'organization member can read its reports');
+select is((select count(*) from public.competitive_intelligence_reports), 3::bigint, 'organization member can read its reports');
 select throws_like($$ insert into public.competitive_intelligence_reports (
   owned_brand_id, competitor_ids, report_engine_version, report_hash, generated_at, payload
 ) select owned_brand_id, competitor_ids, report_engine_version,

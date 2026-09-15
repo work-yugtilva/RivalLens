@@ -7,8 +7,11 @@ describe('every fixture exercises the real orchestrator consistently with its de
   it.each(FIXTURES.map((fixture) => [fixture.fixtureId, fixture] as const))(
     '%s',
     async (_id, fixture) => {
-      const { result, timings } = await runMock(fixture, resolveScenario(fixture.mockScenario));
-      const metrics = extractPerRunMetrics(result, timings);
+      const { result, attempts, timings } = await runMock(
+        fixture,
+        resolveScenario(fixture.mockScenario),
+      );
+      const metrics = extractPerRunMetrics(result, attempts, timings);
 
       // schema-validatable: the orchestrator never rejected the context outright
       expect(result.status).not.toBe('deterministic_fallback_context');

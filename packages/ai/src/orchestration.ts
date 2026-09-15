@@ -2,6 +2,7 @@ import {
   intelligenceContextSchema,
   llmIntelligenceSynthesisOutputSchema,
   type CompetitiveSignal,
+  type IntelligenceGenerationAttemptInput,
   type IntelligenceContext,
   type RecommendedExperimentCandidate,
   type StrategicHypothesis,
@@ -21,8 +22,6 @@ import {
   type IntelligenceModelParameters,
   type IntelligenceModelProvider,
   type IntelligenceProviderErrorCode,
-  type IntelligenceProviderErrorMetadata,
-  type IntelligenceResponseTelemetry,
 } from './provider';
 
 const INTELLIGENCE_SYNTHESIS_SCHEMA_NAME = 'llm-intelligence-synthesis-v1';
@@ -78,12 +77,9 @@ export type SafeAttemptSummary = {
   readonly attemptNumber: 1 | 2;
   readonly kind: 'initial' | 'retry';
   readonly retryReason?: RetryReason;
-  readonly telemetry?: IntelligenceResponseTelemetry;
   readonly providerFailure?: IntelligenceProviderErrorCode;
-  readonly providerFailureMetadata?: IntelligenceProviderErrorMetadata;
   readonly validation?: {
     readonly status: IntelligenceValidationResult['status'];
-    readonly errorCodes: IntelligenceValidationErrorCode[];
   };
 };
 
@@ -126,8 +122,20 @@ type RepairDiagnostic = {
 
 type GenerationAttempt = {
   readonly summary: SafeAttemptSummary;
+  readonly persistenceAttempt: IntelligenceGenerationAttemptInput;
   readonly rawOutput?: unknown;
   readonly validation?: IntelligenceValidationResult;
+};
+
+export type TrustedIntelligenceOrchestrationResult = {
+  readonly result: IntelligenceOrchestrationResult;
+  readonly frozenContext?: DeepReadonly<IntelligenceContext>;
+  readonly contextHash: string;
+  readonly promptVersion: string;
+  readonly providerId: string;
+  readonly modelId: string;
+  readonly parameters: IntelligenceModelParameters;
+  readonly persistenceAttempts: readonly IntelligenceGenerationAttemptInput[];
 };
 
 function deepFreeze<T>(value: T): DeepReadonly<T> {
@@ -200,18 +208,13 @@ function summarizeValidation(
   attemptNumber: 1 | 2,
   kind: SafeAttemptSummary['kind'],
   retryReason: RetryReason | undefined,
-  telemetry: IntelligenceResponseTelemetry,
   validation: IntelligenceValidationResult,
 ): SafeAttemptSummary {
   return {
     attemptNumber,
     kind,
     ...(retryReason ? { retryReason } : {}),
-    telemetry,
-    validation: {
-      status: validation.status,
-      errorCodes: [...new Set(validation.errors.map((error) => error.code))].sort(),
-    },
+    validation: { status: validation.status },
   };
 }
 
@@ -256,23 +259,54 @@ async function generateAttempt(input: {
     return {
       rawOutput: response.rawOutput,
       validation,
+      persistenceAttempt: {
+        attemptNumber: input.attemptNumber,
+        kind: input.kind,
+        ...(input.retryReason ? { retryReason: input.retryReason } : {}),
+        promptVersion: input.promptVersion,
+        telemetry: response.telemetry,
+        rawOutput: { value: response.rawOutput },
+      },
       summary: summarizeValidation(
         input.attemptNumber,
         input.kind,
         input.retryReason,
-        response.telemetry,
         validation,
       ),
     };
   } catch (error) {
     const providerError = error instanceof IntelligenceProviderError ? error : undefined;
     return {
+      persistenceAttempt: {
+        attemptNumber: input.attemptNumber,
+        kind: input.kind,
+        ...(input.retryReason ? { retryReason: input.retryReason } : {}),
+        promptVersion: input.promptVersion,
+        providerFailure: providerError?.code ?? 'provider_exception',
+        ...(providerError?.metadata
+          ? {
+              providerFailureMetadata: {
+                ...(providerError.metadata.httpStatus !== undefined
+                  ? { httpStatus: providerError.metadata.httpStatus }
+                  : {}),
+                ...(providerError.metadata.providerRequestId !== undefined
+                  ? { providerRequestId: providerError.metadata.providerRequestId }
+                  : {}),
+                ...(providerError.metadata.providerErrorCode !== undefined
+                  ? { providerErrorCode: providerError.metadata.providerErrorCode }
+                  : {}),
+                ...(providerError.metadata.fieldViolationPaths !== undefined
+                  ? { fieldViolationPaths: [...providerError.metadata.fieldViolationPaths] }
+                  : {}),
+              },
+            }
+          : {}),
+      },
       summary: {
         attemptNumber: input.attemptNumber,
         kind: input.kind,
         ...(input.retryReason ? { retryReason: input.retryReason } : {}),
         providerFailure: providerError?.code ?? 'provider_exception',
-        ...(providerError?.metadata ? { providerFailureMetadata: providerError.metadata } : {}),
       },
     };
   }
@@ -311,15 +345,29 @@ function fallback(
   };
 }
 
-export async function orchestrateIntelligence(
+export async function orchestrateIntelligenceTrusted(
   input: OrchestrateIntelligenceInput,
-): Promise<IntelligenceOrchestrationResult> {
+): Promise<TrustedIntelligenceOrchestrationResult> {
+  const trusted = (
+    result: IntelligenceOrchestrationResult,
+    context: DeepReadonly<IntelligenceContext> | undefined,
+    attempts: GenerationAttempt[],
+  ): TrustedIntelligenceOrchestrationResult => ({
+    result,
+    ...(context ? { frozenContext: context } : {}),
+    contextHash: input.contextHash,
+    promptVersion: input.promptVersion,
+    providerId: input.provider.providerId,
+    modelId: input.provider.modelId,
+    parameters: input.parameters ?? {},
+    persistenceAttempts: attempts.map((attempt) => attempt.persistenceAttempt),
+  });
   const actualContextHash = intelligenceContextHash(input.context);
   if (actualContextHash !== input.contextHash) {
-    return fallback(input, [], 'CONTEXT_HASH_MISMATCH');
+    return trusted(fallback(input, [], 'CONTEXT_HASH_MISMATCH'), undefined, []);
   }
   const parsedContext = intelligenceContextSchema.safeParse(input.context);
-  if (!parsedContext.success) return fallback(input, [], 'INVALID_CONTEXT');
+  if (!parsedContext.success) return trusted(fallback(input, [], 'INVALID_CONTEXT'), undefined, []);
   const context = deepFreeze(structuredClone(parsedContext.data));
   const first = await generateAttempt({
     provider: input.provider,
@@ -332,15 +380,28 @@ export async function orchestrateIntelligence(
     kind: 'initial',
     onAttemptDebug: input.onAttemptDebug,
   });
-  const attempts = [first.summary];
+  const generationAttempts = [first];
+  const attempts = generationAttempts.map((attempt) => attempt.summary);
 
   if (first.validation) {
     const action = decideRepairAction(first.validation);
     if (action.action === 'accept') {
-      return { status: action.status, acceptedOutput: first.validation.acceptedOutput, attempts };
+      return trusted(
+        { status: action.status, acceptedOutput: first.validation.acceptedOutput, attempts },
+        context,
+        generationAttempts,
+      );
     }
-    if (action.action === 'fallback') return fallback(input, attempts, action.reason);
-    if (!canInvokeProvider(attempts)) return fallback(input, attempts, 'VALIDATION_REPAIR_EXHAUSTED');
+    if (action.action === 'fallback') {
+      return trusted(fallback(input, attempts, action.reason), context, generationAttempts);
+    }
+    if (!canInvokeProvider(attempts)) {
+      return trusted(
+        fallback(input, attempts, 'VALIDATION_REPAIR_EXHAUSTED'),
+        context,
+        generationAttempts,
+      );
+    }
     const second = await generateAttempt({
       provider: input.provider,
       context,
@@ -353,24 +414,51 @@ export async function orchestrateIntelligence(
       retryReason: action.retryReason,
       onAttemptDebug: input.onAttemptDebug,
     });
+    generationAttempts.push(second);
     attempts.push(second.summary);
     if (second.validation) {
       const secondAction = decideRepairAction(second.validation);
       if (secondAction.action === 'accept') {
-        return { status: secondAction.status, acceptedOutput: second.validation.acceptedOutput, attempts };
+        return trusted(
+          {
+            status: secondAction.status,
+            acceptedOutput: second.validation.acceptedOutput,
+            attempts,
+          },
+          context,
+          generationAttempts,
+        );
       }
-      return fallback(input, attempts, 'VALIDATION_REPAIR_EXHAUSTED');
+      return trusted(
+        fallback(input, attempts, 'VALIDATION_REPAIR_EXHAUSTED'),
+        context,
+        generationAttempts,
+      );
     }
-    return fallback(input, attempts, 'PROVIDER_RETRY_EXHAUSTED');
+    return trusted(
+      fallback(input, attempts, 'PROVIDER_RETRY_EXHAUSTED'),
+      context,
+      generationAttempts,
+    );
   }
 
   if (
     !first.summary.providerFailure ||
     !isProviderFailureRetryable(first.summary.providerFailure)
   ) {
-    return fallback(input, attempts, 'PROVIDER_NON_RETRYABLE_FAILURE');
+    return trusted(
+      fallback(input, attempts, 'PROVIDER_NON_RETRYABLE_FAILURE'),
+      context,
+      generationAttempts,
+    );
   }
-  if (!canInvokeProvider(attempts)) return fallback(input, attempts, 'PROVIDER_RETRY_EXHAUSTED');
+  if (!canInvokeProvider(attempts)) {
+    return trusted(
+      fallback(input, attempts, 'PROVIDER_RETRY_EXHAUSTED'),
+      context,
+      generationAttempts,
+    );
+  }
   const second = await generateAttempt({
     provider: input.provider,
     context,
@@ -383,13 +471,32 @@ export async function orchestrateIntelligence(
     retryReason: 'transport',
     onAttemptDebug: input.onAttemptDebug,
   });
+  generationAttempts.push(second);
   attempts.push(second.summary);
   if (second.validation) {
     const action = decideRepairAction(second.validation);
     if (action.action === 'accept') {
-      return { status: action.status, acceptedOutput: second.validation.acceptedOutput, attempts };
+      return trusted(
+        { status: action.status, acceptedOutput: second.validation.acceptedOutput, attempts },
+        context,
+        generationAttempts,
+      );
     }
-    return fallback(input, attempts, 'VALIDATION_REPAIR_EXHAUSTED');
+    return trusted(
+      fallback(input, attempts, 'VALIDATION_REPAIR_EXHAUSTED'),
+      context,
+      generationAttempts,
+    );
   }
-  return fallback(input, attempts, 'PROVIDER_RETRY_EXHAUSTED');
+  return trusted(
+    fallback(input, attempts, 'PROVIDER_RETRY_EXHAUSTED'),
+    context,
+    generationAttempts,
+  );
+}
+
+export async function orchestrateIntelligence(
+  input: OrchestrateIntelligenceInput,
+): Promise<IntelligenceOrchestrationResult> {
+  return (await orchestrateIntelligenceTrusted(input)).result;
 }

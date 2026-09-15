@@ -5,7 +5,7 @@ import {
   snapshotSchema,
   websiteSourceSchema,
   type BrandComparisonResult,
-  type CompetitiveIntelligenceReport,
+  type CompetitiveReportAny,
 } from '@rivallens/schemas';
 import { z } from 'zod';
 
@@ -39,11 +39,11 @@ export type ReferencedEvidence = {
   observations: z.infer<typeof observationRowSchema>[];
 };
 export type ProvenanceItem =
-  CompetitiveIntelligenceReport['sections'][keyof CompetitiveIntelligenceReport['sections']][number];
+  CompetitiveReportAny['sections'][keyof CompetitiveReportAny['sections']][number];
 
 /** Resolve only the immutable references belonging to this item, never current state. */
 export function comparisonForItem(
-  report: CompetitiveIntelligenceReport,
+  report: CompetitiveReportAny,
   item: ProvenanceItem,
   records: ReferencedEvidence,
 ): BrandComparisonResult {

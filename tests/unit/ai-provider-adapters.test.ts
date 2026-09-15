@@ -290,7 +290,8 @@ describe('real intelligence provider adapters', () => {
       expect(result).toMatchObject({ status: 'deterministic_fallback', fallbackReason: 'VALIDATION_REPAIR_EXHAUSTED' });
       expect(fetchSpy).toHaveBeenCalledTimes(2);
       expect(result.attempts).toHaveLength(2);
-      expect(result.attempts[0]?.validation?.errorCodes).toContain('UNKNOWN_SIGNAL_ID');
+      expect(result.attempts[0]?.validation?.status).toBe('failed');
+      expect(result.attempts[0]?.validation).not.toHaveProperty('errorCodes');
     },
   );
 

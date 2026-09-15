@@ -3,7 +3,6 @@ import type {
   IntelligenceModelParameters,
   IntelligenceModelProvider,
   ReasoningEffort,
-  SafeAttemptSummary,
 } from '@rivallens/ai';
 import { EVALUATION_VERSION } from '../config/evaluationVersion';
 import type { ModelConfigEntry } from '../config/models';
@@ -15,7 +14,7 @@ import { evaluateEligibility, type EligibilityResult } from '../gates/eligibilit
 import type { GateConfig } from '../config/gates';
 import { estimatedCostPerRun, resolvePricing, type PricingTable } from '../pricing/pricing';
 import { writeRawAttemptCapture } from '../report/rawCapture';
-import { runFixtureModel } from './runFixtureModel';
+import { runFixtureModel, type EvaluationAttemptSummary } from './runFixtureModel';
 
 export type BenchmarkMode = 'mock' | 'live';
 
@@ -34,7 +33,7 @@ export type BenchmarkRunRecord = {
   readonly fallbackReason: string | null;
   readonly terminalValidatorStatus: string | null;
   // Safe per-attempt telemetry only. Never raw model output, prompt text, or competitor text.
-  readonly attempts: SafeAttemptSummary[];
+  readonly attempts: EvaluationAttemptSummary[];
   readonly perRunMetrics: PerRunMetrics;
   readonly trustBoundary: TrustBoundaryOutcome;
   readonly wallClockMs: number;
@@ -162,16 +161,16 @@ export async function runSuite(input: SuiteRunInput): Promise<BenchmarkResult> {
                 }
               }
             : undefined;
-        const { result, timings } = await runFixtureModel({
+        const { result, attempts, timings } = await runFixtureModel({
           fixture,
           provider,
           parameters,
           ...(onAttemptDebug ? { onAttemptDebug } : {}),
         });
-        const perRunMetrics = extractPerRunMetrics(result, timings);
+        const perRunMetrics = extractPerRunMetrics(result, attempts, timings);
         const trustBoundary = classifyTrustBoundaryOutcome(fixture, perRunMetrics, result);
         const estimatedCostUsd = estimatedCostPerRun(
-          result.attempts.map((attempt) => ({
+          attempts.map((attempt) => ({
             inputTokens: attempt.telemetry?.inputTokens ?? null,
             outputTokens: attempt.telemetry?.outputTokens ?? null,
           })),
@@ -193,7 +192,7 @@ export async function runSuite(input: SuiteRunInput): Promise<BenchmarkResult> {
           fallbackReason:
             result.status === 'deterministic_fallback' ? result.fallbackReason : null,
           terminalValidatorStatus: perRunMetrics.validatorStatus,
-          attempts: result.attempts,
+          attempts,
           perRunMetrics,
           trustBoundary,
           wallClockMs: timings.wallClockMs,
